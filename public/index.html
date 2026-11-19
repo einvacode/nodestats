@@ -17,6 +17,10 @@
         <h1 class="font-semibold leading-tight">NodeStats <span id="identity" class="text-slate-400 font-normal"></span></h1>
         <p id="routerInfo" class="text-xs text-slate-500">memuat…</p>
       </div>
+      <div class="flex items-center gap-1 ml-1 sm:ml-3">
+        <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm max-w-[10rem] sm:max-w-xs focus:outline-none focus:border-sky-500"></select>
+        <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center">⚙</button>
+      </div>
     </div>
     <div class="flex items-center gap-2 text-xs">
       <span id="demoBadge" class="hidden px-2 py-1 rounded bg-amber-500/20 text-amber-300">DEMO</span>
@@ -175,6 +179,39 @@
     <div id="mBody" class="p-4 overflow-y-auto text-sm space-y-1"></div>
   </div>
 </div>
+<div id="mgr" class="hidden fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
+  <div class="bg-slate-900 border border-slate-700 w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl">
+    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="font-semibold">Kelola Router MikroTik</h3>
+      <button id="gClose" class="text-slate-400 hover:text-white text-2xl leading-none px-2">×</button>
+    </div>
+    <div class="overflow-y-auto p-4 space-y-4">
+      <div id="gList" class="space-y-2"></div>
+      <form id="gForm" class="rounded-xl border border-slate-800 p-4 space-y-3">
+        <h4 id="gTitle" class="text-sm font-medium">Tambah Router</h4>
+        <input type="hidden" id="gId">
+        <div class="grid sm:grid-cols-2 gap-3 text-sm">
+          <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">Nama</span><input id="gName" required placeholder="mis. POP Pusat" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
+          <label class="space-y-1"><span class="text-xs text-slate-400">Host / IP</span><input id="gHost" required placeholder="192.168.88.1" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="space-y-1"><span class="text-xs text-slate-400">Protokol</span><select id="gScheme" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5"><option value="https">https</option><option value="http">http</option></select></label>
+            <label class="space-y-1"><span class="text-xs text-slate-400">Port</span><input id="gPort" type="number" value="443" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
+          </div>
+          <label class="space-y-1"><span class="text-xs text-slate-400">User API</span><input id="gUser" value="monitor" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
+          <label class="space-y-1"><span class="text-xs text-slate-400">Password</span><input id="gPass" type="password" autocomplete="new-password" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-slate-300"><input id="gInsecure" type="checkbox" checked> Terima sertifikat self-signed</label>
+        <p id="gMsg" class="text-sm min-h-[1.25rem]"></p>
+        <div class="flex gap-2 flex-wrap">
+          <button type="submit" class="px-4 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-sm">Simpan</button>
+          <button type="button" id="gTest" class="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm">Tes koneksi</button>
+          <button type="button" id="gReset" class="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm hidden">Batal edit</button>
+        </div>
+        <p class="text-xs text-slate-500">Password disimpan di database server. Isi host <code>demo</code> untuk router contoh.</p>
+      </form>
+    </div>
+  </div>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const fmtBps = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' Gbps' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' Mbps' : b >= 1e3 ? (b / 1e3).toFixed(0) + ' Kbps' : Math.round(b) + ' bps';
@@ -197,6 +234,8 @@ function setChart(c, labels, ...series) {
   c.data.labels = labels; series.forEach((s, i) => (c.data.datasets[i].data = s)); c.update();
 }
 const ST = JSON.parse(localStorage.getItem('nodestats') || '{}');
+let rid = +ST.router || 0;
+const rq = (u, o) => fetch(u + (u.includes('?') ? '&' : '?') + 'router=' + rid, o);
 const save = (o) => { Object.assign(ST, o); localStorage.setItem('nodestats', JSON.stringify(ST)); };
 let hist = null, ifaces = [];
 const RANGES = [['live', 'Live'], ['6h', '6 jam'], ['24h', '24 jam'], ['7d', '7 hari'], ['30d', '30 hari']];
@@ -223,7 +262,7 @@ function fmtLabel(ms) {
 async function loadHistory() {
   const sel = $('ifSelect');
   if (range === 'live') {
-    hist = await (await fetch('/api/history')).json();
+    hist = await (await rq('/api/history')).json();
     $('rangeInfo').textContent = 'real-time, 1 jam terakhir';
     const labels = hist.t.map((t) => new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     setChart(cTraffic, labels, hist.rx, hist.tx); setChart(cOnline, labels, hist.online, []); setChart(cCpu, labels, hist.cpu);
@@ -232,7 +271,7 @@ async function loadHistory() {
     return;
   }
   const [from, to] = rangeBounds();
-  const d = await (await fetch(`/api/history?from=${from}&to=${to}&iface=${encodeURIComponent(sel.value)}`)).json();
+  const d = await (await rq(`/api/history?from=${from}&to=${to}&iface=${encodeURIComponent(sel.value)}`)).json();
   hist = d;
   $('rangeInfo').textContent = d.t.length ? `${new Date(from * 1000).toLocaleString('id-ID')} – ${new Date(to * 1000).toLocaleString('id-ID')} · rata-rata per ${Math.round(d.bucket / 60)} menit` : 'Belum ada data pada rentang ini';
   const labels = d.t.map(fmtLabel);
@@ -260,7 +299,7 @@ $('ifFilter').value = ST.ifFilter || '';
 $('ifFilter').oninput = () => { save({ ifFilter: $('ifFilter').value }); renderIfaces(); };
 
 async function loadSummary() {
-  const s = await (await fetch('/api/summary')).json();
+  const s = await (await rq('/api/summary')).json();
   $('identity').textContent = s.identity ? '· ' + s.identity : '';
   $('demoBadge').classList.toggle('hidden', !s.demo);
   $('routerInfo').textContent = [s.router.board, 'ROS ' + (s.router.version || '?'), 'uptime ' + (s.router.uptime || '?')].join(' · ');
@@ -289,7 +328,7 @@ $('pStatus').value = ST.pStatus || 'all'; $('pSearch').value = ST.pSearch || '';
 async function loadPppoe() {
   save({ page, pStatus: $('pStatus').value, pSearch: $('pSearch').value });
   const q = new URLSearchParams({ page, size: 50, status: $('pStatus').value, search: $('pSearch').value });
-  const d = await (await fetch('/api/pppoe?' + q)).json();
+  const d = await (await rq('/api/pppoe?' + q)).json();
   if (!d.rows.length && page > 1) { page = 1; return loadPppoe(); }
   $('pTotal').textContent = `(${fmtN(d.total)})`;
   $('pBody').innerHTML = d.rows.map((r) => `<tr class="hover:bg-slate-800/40">
@@ -322,7 +361,7 @@ async function loadEvents() {
   const [from, to] = evBounds(), search = $('evSearch').value;
   save({ evDate: $('evDate').value, evSpan: $('evSpan').value, evSearch: search });
   const q = new URLSearchParams({ from, to, page: evPage, size: 50, search });
-  const d = await (await fetch('/api/flaps?' + q)).json();
+  const d = await (await rq('/api/flaps?' + q)).json();
   if (!d.rows.length && evPage > 1) { evPage = 1; return loadEvents(); }
   $('evSum').innerHTML = `<span class="text-rose-300">Total putus: ${fmtN(d.totalDowns || 0)}×</span>`;
   $('evTotal').textContent = `(${fmtN(d.total)} user)`;
@@ -361,7 +400,7 @@ async function openUser(name) {
   $('modal').classList.remove('hidden'); document.body.classList.add('overflow-hidden');
   $('mName').textContent = mUser; $('mBody').innerHTML = '<p class="text-slate-500">Memuat…</p>';
   const now = Math.floor(Date.now() / 1000), from = now - $('mRange').value * 86400;
-  const d = await (await fetch(`/api/user?name=${encodeURIComponent(mUser)}&from=${from}&to=${now + 60}`)).json();
+  const d = await (await rq(`/api/user?name=${encodeURIComponent(mUser)}&from=${from}&to=${now + 60}`)).json();
   $('mInfo').innerHTML = `<span class="px-2 py-0.5 rounded ${d.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${d.online ? 'online' : 'offline'}</span> `
     + [d.profile && 'profile ' + d.profile, d.address, d.mac, d.uptime && 'uptime ' + d.uptime].filter(Boolean).map(esc).join(' · ');
   const asc = [...d.events].reverse();               // oldest -> newest
@@ -393,10 +432,90 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal
 $('mRange').onchange = () => openUser();
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-user]'); if (b) openUser(b.dataset.user); });
 
+let routers = [], routerSig = '';
+async function loadRouters() {
+  routers = await (await fetch('/api/routers')).json();
+  const sig = routers.map((r) => r.id + ':' + r.name).join('|');
+  if (!routers.some((r) => r.id === rid)) { rid = routers[0]?.id || 0; save({ router: rid }); }
+  if (sig !== routerSig) {
+    routerSig = sig;
+    $('routerSel').innerHTML = routers.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('') || '<option value="">(belum ada router)</option>';
+  }
+  $('routerSel').value = rid || '';
+  if (!$('mgr').classList.contains('hidden')) drawRouterList();
+}
+function resetForRouter() {
+  $('ifSelect').innerHTML = ''; save({ iface: '' }); delete ST.iface;
+  page = 1; evPage = 1; hist = null; ifaces = [];
+  [cTraffic, cOnline, cCpu, cIf].forEach((c) => { c.data.labels = []; c.data.datasets.forEach((d) => (d.data = [])); c.update(); });
+  $('pBody').innerHTML = ''; $('evBody').innerHTML = ''; $('ifBody').innerHTML = '';
+  closeModal(); n = 0; tick();
+}
+$('routerSel').onchange = () => { rid = +$('routerSel').value; save({ router: rid }); resetForRouter(); };
+
+// router manager
+const gMsg = (m, ok) => { $('gMsg').textContent = m; $('gMsg').className = 'text-sm min-h-[1.25rem] ' + (ok ? 'text-emerald-400' : 'text-rose-400'); };
+function openMgr() { $('mgr').classList.remove('hidden'); document.body.classList.add('overflow-hidden'); drawRouterList(); }
+function closeMgr() { $('mgr').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+function drawRouterList() {
+  $('gList').innerHTML = routers.length ? routers.map((r) => {
+    const s = r.status, st = !r.enabled ? ['nonaktif', 'bg-slate-700 text-slate-300'] : !s || !s.updated ? [s?.error ? 'gagal' : 'menghubungkan', 'bg-amber-500/20 text-amber-300']
+      : s.error ? ['gagal', 'bg-rose-500/20 text-rose-300'] : ['online', 'bg-emerald-500/20 text-emerald-300'];
+    return `<div class="rounded-xl border ${r.id === rid ? 'border-sky-500/60' : 'border-slate-800'} p-3 flex items-center gap-3 flex-wrap">
+      <div class="flex-1 min-w-[10rem]"><div class="font-medium break-all">${esc(r.name)} <span class="px-2 py-0.5 rounded text-xs ${st[1]}">${st[0]}</span></div>
+        <div class="text-xs text-slate-500 break-all">${esc(r.scheme)}://${esc(r.host)}:${r.port} · ${esc(r.user)}${s && s.updated ? ` · ${fmtN(s.online)} online / ${fmtN(s.offline)} offline` : ''}</div>
+        ${s?.error ? `<div class="text-xs text-rose-400 break-all">${esc(s.error)}</div>` : ''}</div>
+      <div class="flex gap-1 text-xs">
+        <button data-act="pick" data-id="${r.id}" class="px-3 py-1 rounded bg-sky-600/80 hover:bg-sky-600">Pilih</button>
+        <button data-act="edit" data-id="${r.id}" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
+        <button data-act="toggle" data-id="${r.id}" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700">${r.enabled ? 'Nonaktifkan' : 'Aktifkan'}</button>
+        <button data-act="del" data-id="${r.id}" class="px-3 py-1 rounded bg-rose-600/70 hover:bg-rose-600">Hapus</button>
+      </div></div>`;
+  }).join('') : '<p class="text-sm text-slate-500">Belum ada router. Tambahkan di form bawah.</p>';
+}
+function resetForm() {
+  $('gForm').reset(); $('gId').value = ''; $('gTitle').textContent = 'Tambah Router'; $('gReset').classList.add('hidden');
+  $('gPass').placeholder = ''; $('gPort').value = 443; gMsg('');
+}
+const formBody = () => ({ name: $('gName').value, host: $('gHost').value, scheme: $('gScheme').value, port: +$('gPort').value || 443,
+  user: $('gUser').value, pass: $('gPass').value, insecure: $('gInsecure').checked });
+$('gList').onclick = async (e) => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = +b.dataset.id, r = routers.find((x) => x.id === id);
+  if (b.dataset.act === 'pick') { rid = id; save({ router: id }); $('routerSel').value = id; closeMgr(); resetForRouter(); }
+  if (b.dataset.act === 'edit') {
+    $('gId').value = id; $('gName').value = r.name; $('gHost').value = r.host; $('gScheme').value = r.scheme; $('gPort').value = r.port;
+    $('gUser').value = r.user; $('gPass').value = ''; $('gPass').placeholder = 'kosongkan = tidak diubah'; $('gInsecure').checked = r.insecure;
+    $('gTitle').textContent = 'Edit Router'; $('gReset').classList.remove('hidden'); gMsg(''); $('gName').focus();
+  }
+  if (b.dataset.act === 'toggle') { await fetch('/api/routers/' + id, { method: 'PUT', body: JSON.stringify({ enabled: !r.enabled }) }); await loadRouters(); }
+  if (b.dataset.act === 'del' && confirm(`Hapus router "${r.name}" beserta seluruh riwayat datanya?`)) {
+    await fetch('/api/routers/' + id, { method: 'DELETE' }); await loadRouters(); if (id === rid) resetForRouter(); drawRouterList();
+  }
+};
+$('gForm').onsubmit = async (e) => {
+  e.preventDefault(); const id = $('gId').value;
+  const r = await fetch(id ? '/api/routers/' + id : '/api/routers', { method: id ? 'PUT' : 'POST', body: JSON.stringify(formBody()) });
+  const d = await r.json(); if (d.error) return gMsg(d.error, false);
+  gMsg('Tersimpan', true); resetForm(); await loadRouters();
+  if (!id) { rid = d.id; save({ router: rid }); $('routerSel').value = rid; resetForRouter(); }
+};
+$('gTest').onclick = async () => {
+  gMsg('Menguji koneksi…', true);
+  const d = await (await fetch('/api/routers/test', { method: 'POST', body: JSON.stringify({ ...formBody(), id: +$('gId').value || undefined }) })).json();
+  d.ok ? gMsg(`Berhasil: ${d.identity} · ROS ${d.version}${d.board ? ' · ' + d.board : ''}`, true) : gMsg('Gagal: ' + d.error, false);
+};
+$('gReset').onclick = resetForm;
+$('mgrBtn').onclick = openMgr; $('gClose').onclick = closeMgr;
+$('mgr').onclick = (e) => { if (e.target.id === 'mgr') closeMgr(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMgr(); });
+
 let n = 0;
 async function tick() {
   if (document.hidden) return;
   try {
+    await loadRouters();
+    if (!rid) { $('routerInfo').textContent = 'Belum ada router'; $('statusBadge').textContent = '● -'; if (!ST.askedAdd) { save({ askedAdd: 1 }); openMgr(); } return; }
     await loadSummary();
     const jobs = [];
     if (tab === 'pppoe') jobs.push(loadPppoe());

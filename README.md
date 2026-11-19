@@ -37,3 +37,7 @@ SQLite bawaan Node (node:sqlite, perlu Node >= 22.13), file di folder data/ (ata
 3. Edit /opt/nodestats/.env dan /etc/apache2/sites-available/nodestats.conf, lalu: systemctl restart nodestats apache2
 4. Log: journalctl -u nodestats -f. Backup: salin /var/lib/nodestats/nodestats.db.
 
+
+## Multi router
+Satu dashboard bisa memonitor banyak MikroTik. Pilih router lewat dropdown di header; tombol gear membuka Kelola Router (tambah, edit, tes koneksi, nonaktifkan, hapus). Router disimpan di database (tabel routers) beserta riwayatnya masing-masing. Saat pertama jalan, ROS_HOST dari .env otomatis menjadi router pertama; data lama dimigrasi ke router tersebut. Setelah itu kelola router dari UI saja (ROS_* di .env diabaikan). Perlu dicatat: password router disimpan di file database, jadi batasi akses ke folder data dan aktifkan DASH_USER/DASH_PASS.
+
