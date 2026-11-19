@@ -23,6 +23,7 @@ const CFG = {
   hide: env('HIDE_IFACE_TYPES', 'pppoe-in,pppoe-out,l2tp-in,sstp-in,ovpn-in,pptp-in').split(','),
 };
 const DB = require('./db');
+const UPD = require('./update');
 const HIST_MAX = 360; // 360 * 10s = 1 hour
 
 // ---- RouterOS REST ----
@@ -239,6 +240,15 @@ http.createServer(async (req, res) => {
   }
   const u = new URL(req.url, 'http://x'), q = u.searchParams, now = Math.floor(Date.now() / 1000);
   try {
+    // CSRF guard: state-changing calls must carry a custom header (forces a CORS preflight for cross-site pages)
+    if (req.method !== 'GET' && u.pathname.startsWith('/api/') && req.headers['x-requested-with'] !== 'nodestats') return send(res, 403, { error: 'forbidden' });
+    // self update (git)
+    if (u.pathname === '/api/update/status' && req.method === 'GET') return send(res, 200, await UPD.status());
+    if (u.pathname === '/api/update/check' && req.method === 'POST') return send(res, 200, await UPD.check());
+    if (u.pathname === '/api/update/apply' && req.method === 'POST') {
+      if (!CFG.dashUser) return send(res, 403, { error: 'Isi DASH_USER/DASH_PASS dulu sebelum memakai update' });
+      return send(res, 200, await UPD.apply());
+    }
     // router management
     if (u.pathname === '/api/routers' && req.method === 'GET') return send(res, 200, DB.listRouters().map(publicRouter));
     if (u.pathname === '/api/routers' && req.method === 'POST') {
@@ -299,3 +309,4 @@ http.createServer(async (req, res) => {
     });
   } catch (e) { send(res, 400, { error: e.message }); }
 }).listen(CFG.portWeb, env('HOST', '0.0.0.0'), () => console.log(`NodeStats on http://localhost:${CFG.portWeb}  (${collectors.size} router)`));
+UPD.schedule();

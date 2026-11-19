@@ -11,6 +11,7 @@ WorkingDirectory=/opt/nodestats
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server.js
 Environment=HOST=127.0.0.1
 Environment=DATA_DIR=/var/lib/nodestats
+Environment=HOME=/var/lib/nodestats
 Restart=always
 RestartSec=5
 # hardening
@@ -18,7 +19,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/nodestats
+ReadWritePaths=/var/lib/nodestats /opt/nodestats
 
 [Install]
 WantedBy=multi-user.target

@@ -19,6 +19,7 @@
       </div>
       <div class="flex items-center gap-1 ml-1 sm:ml-3">
         <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm max-w-[10rem] sm:max-w-xs focus:outline-none focus:border-sky-500"></select>
+        <button id="updBtn" title="Update aplikasi" class="relative h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
         <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center">⚙</button>
       </div>
     </div>
@@ -212,6 +213,24 @@
     </div>
   </div>
 </div>
+<div id="upd" class="hidden fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
+  <div class="bg-slate-900 border border-slate-700 w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl">
+    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="font-semibold">Update Aplikasi</h3>
+      <button id="uClose" class="text-slate-400 hover:text-white text-2xl leading-none px-2">×</button>
+    </div>
+    <div class="p-4 overflow-y-auto space-y-3 text-sm">
+      <div id="uCur" class="rounded-lg bg-slate-800/60 p-3 space-y-1"></div>
+      <p id="uMsg" class="min-h-[1.25rem]"></p>
+      <div id="uList" class="space-y-1 max-h-48 overflow-y-auto"></div>
+      <div class="flex gap-2 flex-wrap">
+        <button id="uCheck" class="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700">Cek update</button>
+        <button id="uApply" class="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Update sekarang</button>
+      </div>
+      <p class="text-xs text-slate-500">Mengambil perubahan terbaru dari GitHub (git pull), lalu aplikasi restart otomatis. File <code>.env</code> dan database tidak ikut berubah.</p>
+    </div>
+  </div>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const fmtBps = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' Gbps' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' Mbps' : b >= 1e3 ? (b / 1e3).toFixed(0) + ' Kbps' : Math.round(b) + ' bps';
@@ -233,6 +252,8 @@ const cIf = mk('cIf', [['Rx', '#38bdf8'], ['Tx', '#34d399']], mbps);
 function setChart(c, labels, ...series) {
   c.data.labels = labels; series.forEach((s, i) => (c.data.datasets[i].data = s)); c.update();
 }
+const _fetch = window.fetch.bind(window);
+window.fetch = (u, o = {}) => _fetch(u, { ...o, headers: { 'X-Requested-With': 'nodestats', ...(o.headers || {}) } });
 const ST = JSON.parse(localStorage.getItem('nodestats') || '{}');
 let rid = +ST.router || 0;
 const rq = (u, o) => fetch(u + (u.includes('?') ? '&' : '?') + 'router=' + rid, o);
@@ -509,6 +530,51 @@ $('gReset').onclick = resetForm;
 $('mgrBtn').onclick = openMgr; $('gClose').onclick = closeMgr;
 $('mgr').onclick = (e) => { if (e.target.id === 'mgr') closeMgr(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMgr(); });
+
+// ---- app update ----
+let upd = null;
+const uMsg = (m, c = 'text-slate-300') => { $('uMsg').textContent = m; $('uMsg').className = 'min-h-[1.25rem] ' + c; };
+function drawUpd() {
+  if (!upd) return;
+  const c = upd.current;
+  $('uCur').innerHTML = c ? `<div class="text-xs text-slate-500">Versi terpasang · branch ${esc(upd.branch)}</div>
+    <div><span class="font-mono text-sky-400">${esc(c.hash)}</span> ${esc(c.subject)}</div>
+    <div class="text-xs text-slate-500">${new Date(c.date).toLocaleString('id-ID')} · ${esc(upd.remote || '')}</div>` : '<div class="text-slate-400">Info versi tidak tersedia</div>';
+  $('updDot').classList.toggle('hidden', !(upd.behind > 0));
+  $('uList').innerHTML = (upd.commits || []).map((k) => `<div class="rounded bg-slate-800/50 px-3 py-1.5"><span class="font-mono text-amber-300">${esc(k.hash)}</span> ${esc(k.subject)}
+    <span class="text-xs text-slate-500 block">${esc(k.author)} · ${new Date(k.date).toLocaleString('id-ID')}</span></div>`).join('');
+  $('uApply').disabled = !(upd.enabled && upd.behind > 0 && !upd.applying);
+  if (upd.reason) uMsg(upd.reason, 'text-amber-400');
+  else if (upd.error) uMsg('Gagal cek: ' + upd.error, 'text-rose-400');
+  else if (upd.behind > 0) uMsg(`Ada ${upd.behind} update baru`, 'text-amber-300');
+  else uMsg(upd.lastCheck ? 'Sudah versi terbaru · dicek ' + new Date(upd.lastCheck).toLocaleTimeString('id-ID') : 'Belum pernah dicek', 'text-emerald-400');
+}
+async function loadUpd() { try { upd = await (await fetch('/api/update/status')).json(); drawUpd(); } catch {} }
+$('updBtn').onclick = () => { $('upd').classList.remove('hidden'); document.body.classList.add('overflow-hidden'); loadUpd(); };
+const closeUpd = () => { $('upd').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
+$('uClose').onclick = closeUpd; $('upd').onclick = (e) => { if (e.target.id === 'upd') closeUpd(); };
+$('uCheck').onclick = async () => {
+  uMsg('Mengecek GitHub…'); $('uCheck').disabled = true;
+  try { const r = await fetch('/api/update/check', { method: 'POST' }); const d = await r.json(); if (d.error) uMsg(d.error, 'text-rose-400'); else { upd = d; drawUpd(); } }
+  catch (e) { uMsg('Gagal: ' + e.message, 'text-rose-400'); }
+  $('uCheck').disabled = false;
+};
+$('uApply').onclick = async () => {
+  if (!confirm('Update dan restart aplikasi sekarang?')) return;
+  $('uApply').disabled = true; uMsg('Mengunduh update…');
+  try {
+    const r = await fetch('/api/update/apply', { method: 'POST' }); const d = await r.json();
+    if (d.error) { uMsg(d.error, 'text-rose-400'); $('uApply').disabled = false; return; }
+    uMsg('Update berhasil, aplikasi restart…', 'text-emerald-400');
+    for (let k = 0; k < 40; k++) {        // wait until the server answers again, then reload
+      await new Promise((ok) => setTimeout(ok, 1500));
+      try { const s = await _fetch('/api/update/status'); if (s.ok) { location.reload(); return; } } catch {}
+    }
+    uMsg('Server belum merespons. Coba refresh manual.', 'text-amber-400');
+  } catch (e) { uMsg('Gagal: ' + e.message, 'text-rose-400'); $('uApply').disabled = false; }
+};
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeUpd(); });
+loadUpd(); setInterval(loadUpd, 10 * 60 * 1000);
 
 let n = 0;
 async function tick() {
