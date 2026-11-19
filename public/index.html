@@ -10,30 +10,33 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col">
-<header class="sticky top-0 z-10 bg-slate-900/90 backdrop-blur border-b border-slate-800">
-  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 flex-wrap">
-    <div class="flex items-center gap-3">
-      <div id="brandLogoBox" class="h-9 w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold overflow-hidden shrink-0">N</div>
-      <div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <h1 class="font-semibold leading-tight"><span id="brandName">NodeStats</span> <span id="identity" class="text-slate-400 font-normal"></span></h1>
-          <span id="brandTagline" class="hidden text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400"></span>
+<header id="topHeader" class="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-800 transition-transform duration-200">
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 pt-2 pb-1 sm:py-2.5 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div id="brandLogoBox" class="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold overflow-hidden shrink-0">N</div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <h1 class="font-semibold leading-tight truncate text-sm sm:text-base"><span id="brandName">NodeStats</span> <span id="identity" class="hidden sm:inline text-slate-400 font-normal"></span></h1>
+          <span id="brandTagline" class="hidden md:inline text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0"></span>
         </div>
-        <p id="routerInfo" class="text-xs text-slate-500">memuat…</p>
-      </div>
-      <div class="flex items-center gap-1 ml-1 sm:ml-3">
-        <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm max-w-[10rem] sm:max-w-xs focus:outline-none focus:border-sky-500"></select>
-        <button id="updBtn" title="Update aplikasi" class="relative h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
-        <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center">⚙</button>
+        <p id="routerInfo" class="text-[11px] sm:text-xs text-slate-500 truncate">memuat…</p>
       </div>
     </div>
-    <div class="flex items-center gap-2 text-xs">
-      <span id="demoBadge" class="hidden px-2 py-1 rounded bg-amber-500/20 text-amber-300">DEMO</span>
-      <span id="statusBadge" class="px-2 py-1 rounded bg-slate-800 text-slate-400">…</span>
-      <span id="live" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span><span id="updated" class="text-slate-500"></span>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 sm:py-1.5 text-xs sm:text-sm max-w-[8.5rem] sm:max-w-xs focus:outline-none focus:border-sky-500"></select>
+      <button id="updBtn" title="Update aplikasi" class="relative h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
+      <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm">⚙</button>
     </div>
   </div>
-  <nav id="tabs" class="max-w-7xl mx-auto px-3 sm:px-4 flex gap-1 overflow-x-auto text-sm"></nav>
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
+    <nav id="tabs" class="flex gap-1 overflow-x-auto text-xs sm:text-sm"></nav>
+    <div class="flex items-center gap-1.5 text-[11px] sm:text-xs shrink-0">
+      <span id="demoBadge" class="hidden px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">DEMO</span>
+      <span id="statusBadge" class="hidden sm:inline px-2 py-0.5 rounded bg-slate-800 text-slate-400">…</span>
+      <span id="live" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span id="updated" class="text-slate-500 tabular-nums"></span>
+    </div>
+  </div>
 </header>
 
 <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -407,7 +410,7 @@ async function loadSummary() {
   $('routerInfo').textContent = [s.router.board, 'ROS ' + (s.router.version || '?'), 'uptime ' + (s.router.uptime || '?')].join(' · ');
   const ok = s.updated && !s.error;
   $('statusBadge').textContent = ok ? '● Terhubung' : '● Terputus';
-  $('statusBadge').className = 'px-2 py-1 rounded ' + (ok ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300');
+  $('statusBadge').className = 'hidden sm:inline px-2 py-0.5 rounded ' + (ok ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300');
   $('updated').textContent = s.updated ? new Date(s.updated).toLocaleTimeString('id-ID') : '';
   $('errorBox').classList.toggle('hidden', !s.error); $('errorBox').textContent = s.error ? 'Gagal polling router: ' + s.error : '';
   const p = s.pppoe;
@@ -775,7 +778,14 @@ async function tick() {
   } catch (e) { console.error(e); $('live').className = 'h-2 w-2 rounded-full bg-rose-500'; }
 }
 tick().then(() => { if (ST.scroll) window.scrollTo(0, ST.scroll); });
-let sT; window.addEventListener('scroll', () => { clearTimeout(sT); sT = setTimeout(() => save({ scroll: Math.round(window.scrollY) }), 150); }, { passive: true });
+let sT, lastY = window.scrollY;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  if (y > 60 && y > lastY + 6) $('topHeader').classList.add('-translate-y-full');
+  else if (y < lastY - 6 || y <= 40) $('topHeader').classList.remove('-translate-y-full');
+  lastY = y;
+  clearTimeout(sT); sT = setTimeout(() => save({ scroll: Math.round(y) }), 150);
+}, { passive: true });
 setInterval(tick, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 </script>
