@@ -4,17 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NodeStats – MikroTik Monitor</title>
+<link id="favicon" rel="icon" href="data:,">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config = { darkMode: 'class' }</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen">
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col">
 <header class="sticky top-0 z-10 bg-slate-900/90 backdrop-blur border-b border-slate-800">
   <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 flex-wrap">
     <div class="flex items-center gap-3">
-      <div class="h-9 w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold">N</div>
+      <div id="brandLogoBox" class="h-9 w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold overflow-hidden shrink-0">N</div>
       <div>
-        <h1 class="font-semibold leading-tight">NodeStats <span id="identity" class="text-slate-400 font-normal"></span></h1>
+        <div class="flex items-center gap-2 flex-wrap">
+          <h1 class="font-semibold leading-tight"><span id="brandName">NodeStats</span> <span id="identity" class="text-slate-400 font-normal"></span></h1>
+          <span id="brandTagline" class="hidden text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400"></span>
+        </div>
         <p id="routerInfo" class="text-xs text-slate-500">memuat…</p>
       </div>
       <div class="flex items-center gap-1 ml-1 sm:ml-3">
@@ -36,7 +40,7 @@
   <div id="errorBox" class="hidden rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 px-4 py-3 text-sm"></div>
 
   <!-- KPI cards -->
-  <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+  <section id="kpiSection" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
     <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl sm:text-3xl font-bold text-emerald-400">-</p></div>
     <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl sm:text-3xl font-bold text-rose-400">-</p></div>
     <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">Total Aktif (secret)</p><p id="kEnabled" class="text-2xl sm:text-3xl font-bold">-</p><p id="kDisabled" class="text-xs text-slate-500"></p></div>
@@ -51,6 +55,9 @@
       <p class="text-xs text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl sm:text-3xl font-bold">-</p><p id="kTemp" class="text-xs text-slate-500"></p>
     </div>
   </section>
+
+  <!-- Network sub-menu -->
+  <nav id="netTabs" class="flex gap-1.5 overflow-x-auto rounded-xl bg-slate-900 border border-slate-800 p-1.5 text-sm"></nav>
 
   <div data-tab="grafik" class="space-y-4 sm:space-y-6">
   <!-- range -->
@@ -163,7 +170,81 @@
     </div>
   </section>
   </div>
+  <div data-tab="pengaturan" class="space-y-4 sm:space-y-6 hidden">
+  <!-- company & logo settings -->
+  <section class="grid lg:grid-cols-3 gap-4">
+    <form id="setForm" class="lg:col-span-2 rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-5">
+      <div>
+        <h2 class="text-base font-semibold">Profil Perusahaan &amp; Logo</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Ubah identitas dashboard, logo, dan informasi kontak perusahaan/ISP Anda.</p>
+      </div>
+
+      <!-- logo uploader -->
+      <div class="flex items-center gap-4 flex-wrap p-3 rounded-xl bg-slate-950/50 border border-slate-800">
+        <div id="sLogoPrev" class="h-16 w-16 rounded-xl bg-sky-500/20 text-sky-400 grid place-items-center text-2xl font-bold overflow-hidden shrink-0">N</div>
+        <div class="space-y-2 flex-1 min-w-[12rem]">
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium cursor-pointer">
+              Upload Logo
+              <input id="sLogoFile" type="file" accept="image/*" class="hidden">
+            </label>
+            <button type="button" id="sLogoClear" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">Reset ke Inisial</button>
+          </div>
+          <p class="text-xs text-slate-500">Format PNG, JPG, WEBP, atau SVG. Gambar otomatis dikompres dan disimpan di database.</p>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Nama Perusahaan / Brand *</span>
+          <input id="sCompanyName" required placeholder="mis. PT. FiberNode Network" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Tagline / Subjudul</span>
+          <input id="sTagline" placeholder="mis. ISP &amp; NOC Monitoring" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Kontak / No. Telepon / NOC</span>
+          <input id="sContact" placeholder="mis. 0812-3456-7890 / noc@domain.id" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Website / Email</span>
+          <input id="sWebsite" placeholder="mis. https://fibernode.id" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1 sm:col-span-2">
+          <span class="text-xs text-slate-400">Alamat Perusahaan</span>
+          <input id="sAddress" placeholder="mis. Jl. Sudirman No. 10, Jakarta" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1 sm:col-span-2">
+          <span class="text-xs text-slate-400">Catatan Footer</span>
+          <input id="sFooter" placeholder="mis. © 2026 PT. FiberNode Network. Internal NOC Dashboard." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3 flex-wrap pt-1">
+        <button type="submit" class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Simpan Pengaturan</button>
+        <span id="sMsg" class="text-sm"></span>
+      </div>
+    </form>
+
+    <div class="space-y-4">
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-3">
+        <h3 class="text-base font-semibold">Manajemen Sistem</h3>
+        <p class="text-xs text-slate-400">Kelola daftar perangkat MikroTik yang dipantau dan pembaruan aplikasi.</p>
+        <div class="space-y-2 pt-1">
+          <button type="button" id="sOpenMgr" class="w-full px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-left flex items-center justify-between">
+            <span>⚙ Kelola Router MikroTik</span><span class="text-xs text-slate-400">Tambah / Edit ›</span>
+          </button>
+          <button type="button" id="sOpenUpd" class="w-full px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-left flex items-center justify-between">
+            <span>⬆ Update Aplikasi (GitHub)</span><span class="text-xs text-slate-400">Cek Versi ›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
 </main>
+<footer id="companyFooter" class="mt-auto max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 border-t border-slate-900 text-xs text-slate-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"></footer>
 
 <div id="modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
   <div class="bg-slate-900 border border-slate-700 w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl">
@@ -405,15 +486,117 @@ $('evDate').onchange = () => { evPage = 1; loadEvents(); };
 $('evSpan').onchange = () => { evPage = 1; loadEvents(); };
 $('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; loadEvents(); }, 300); };
 
-const TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat']];
-let tab = TABS.some(([k]) => k === ST.tab) ? ST.tab : 'grafik';
+const MAIN_TABS = [['network', 'Network'], ['pengaturan', 'Pengaturan']];
+const NET_TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat']];
+let mainTab = ST.mainTab === 'pengaturan' || ST.tab === 'pengaturan' ? 'pengaturan' : 'network';
+let netTab = NET_TABS.some(([k]) => k === (ST.netTab || ST.tab)) ? (ST.netTab || ST.tab) : 'grafik';
+let tab = mainTab === 'pengaturan' ? 'pengaturan' : netTab;
 function showTab() {
-  $('tabs').innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="px-4 py-2 whitespace-nowrap border-b-2 ${tab === k ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'}">${esc(l)}</button>`).join('');
+  tab = mainTab === 'pengaturan' ? 'pengaturan' : netTab;
+  $('tabs').innerHTML = MAIN_TABS.map(([k, l]) => `<button data-m="${k}" class="px-4 py-2 whitespace-nowrap border-b-2 font-medium ${mainTab === k ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'}">${esc(l)}</button>`).join('');
+  $('netTabs').innerHTML = NET_TABS.map(([k, l]) => `<button data-n="${k}" class="px-3.5 py-1.5 rounded-lg whitespace-nowrap font-medium transition ${netTab === k ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'}">${esc(l)}</button>`).join('');
+  const isNet = mainTab === 'network';
+  $('kpiSection').classList.toggle('hidden', !isNet);
+  $('netTabs').classList.toggle('hidden', !isNet);
   document.querySelectorAll('[data-tab]').forEach((el) => el.classList.toggle('hidden', el.dataset.tab !== tab));
-  [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.resize());
+  if (tab === 'grafik') [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.resize());
 }
-$('tabs').onclick = (e) => { const k = e.target.dataset.t; if (!k) return; tab = k; save({ tab }); showTab(); window.scrollTo(0, 0); n = 0; tick(); };
+$('tabs').onclick = (e) => { const k = e.target.dataset.m; if (!k) return; mainTab = k; save({ mainTab, tab: mainTab === 'pengaturan' ? 'pengaturan' : netTab }); showTab(); window.scrollTo(0, 0); n = 0; tick(); };
+$('netTabs').onclick = (e) => { const k = e.target.dataset.n; if (!k) return; netTab = k; save({ netTab, tab: netTab }); showTab(); n = 0; tick(); };
 showTab();
+
+// ---- company & logo settings ----
+let cfg = { companyName: 'NodeStats', tagline: '', address: '', contact: '', website: '', footer: '', logo: '' };
+let pendingLogo = '';
+const initialOf = (name) => (String(name || 'N').trim()[0] || 'N').toUpperCase();
+function renderLogoBox(el, logo, name) {
+  if (logo) {
+    el.innerHTML = `<img src="${esc(logo)}" alt="Logo" class="h-full w-full object-contain">`;
+    el.classList.remove('bg-sky-500/20'); el.classList.add('bg-slate-800/60');
+  } else {
+    el.textContent = initialOf(name);
+    el.classList.add('bg-sky-500/20'); el.classList.remove('bg-slate-800/60');
+  }
+}
+function applyBranding(s) {
+  cfg = { ...cfg, ...s };
+  const name = cfg.companyName || 'NodeStats';
+  $('brandName').textContent = name;
+  document.title = name + (cfg.tagline ? ' – ' + cfg.tagline : ' – MikroTik Monitor');
+  $('brandTagline').textContent = cfg.tagline || '';
+  $('brandTagline').classList.toggle('hidden', !cfg.tagline);
+  renderLogoBox($('brandLogoBox'), cfg.logo, name);
+  $('favicon').href = cfg.logo || 'data:,';
+  const left = [cfg.footer || (`© ${new Date().getFullYear()} ${name}`), cfg.address].filter(Boolean).map(esc).join(' · ');
+  const right = [cfg.contact, cfg.website].filter(Boolean).map(esc).join(' · ');
+  $('companyFooter').innerHTML = `<div>${left}</div><div>${right}</div>`;
+}
+function fillSettingsForm() {
+  pendingLogo = cfg.logo || '';
+  $('sCompanyName').value = cfg.companyName || 'NodeStats';
+  $('sTagline').value = cfg.tagline || '';
+  $('sContact').value = cfg.contact || '';
+  $('sWebsite').value = cfg.website || '';
+  $('sAddress').value = cfg.address || '';
+  $('sFooter').value = cfg.footer || '';
+  renderLogoBox($('sLogoPrev'), pendingLogo, $('sCompanyName').value);
+}
+async function loadSettings() {
+  try {
+    const s = await (await fetch('/api/settings')).json();
+    applyBranding(s);
+    fillSettingsForm();
+  } catch (e) { console.error(e); }
+}
+$('sCompanyName').oninput = () => { if (!pendingLogo) renderLogoBox($('sLogoPrev'), '', $('sCompanyName').value); };
+$('sLogoClear').onclick = () => { pendingLogo = ''; $('sLogoFile').value = ''; renderLogoBox($('sLogoPrev'), '', $('sCompanyName').value); };
+$('sLogoFile').onchange = (e) => {
+  const file = e.target.files?.[0]; if (!file) return;
+  if (file.type === 'image/svg+xml') {
+    const rd = new FileReader();
+    rd.onload = () => { pendingLogo = rd.result; renderLogoBox($('sLogoPrev'), pendingLogo, $('sCompanyName').value); };
+    rd.readAsDataURL(file);
+    return;
+  }
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const max = 160, scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(img.width * scale));
+    cv.height = Math.max(1, Math.round(img.height * scale));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    pendingLogo = cv.toDataURL('image/png');
+    renderLogoBox($('sLogoPrev'), pendingLogo, $('sCompanyName').value);
+  };
+  img.src = url;
+};
+$('setForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('sMsg').textContent = 'Menyimpan…'; $('sMsg').className = 'text-sm text-slate-400';
+  try {
+    const body = {
+      companyName: $('sCompanyName').value.trim() || 'NodeStats',
+      tagline: $('sTagline').value.trim(),
+      contact: $('sContact').value.trim(),
+      website: $('sWebsite').value.trim(),
+      address: $('sAddress').value.trim(),
+      footer: $('sFooter').value.trim(),
+      logo: pendingLogo,
+    };
+    const r = await fetch('/api/settings', { method: 'POST', body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) { $('sMsg').textContent = d.error; $('sMsg').className = 'text-sm text-rose-400'; return; }
+    applyBranding(d); fillSettingsForm();
+    $('sMsg').textContent = '✓ Pengaturan tersimpan'; $('sMsg').className = 'text-sm text-emerald-400';
+    setTimeout(() => { if ($('sMsg').textContent.startsWith('✓')) $('sMsg').textContent = ''; }, 3000);
+  } catch (err) {
+    $('sMsg').textContent = 'Gagal: ' + err.message; $('sMsg').className = 'text-sm text-rose-400';
+  }
+};
+$('sOpenMgr').onclick = () => openMgr();
+$('sOpenUpd').onclick = () => $('updBtn').click();
+loadSettings();
 
 let mUser = '';
 async function openUser(name) {

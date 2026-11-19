@@ -33,6 +33,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, router_id INTEGER NOT NULL, ts INTEGER NOT NULL, name TEXT NOT NULL, event TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL
+  );
   CREATE INDEX IF NOT EXISTS idx_events_r_ts ON events(router_id, ts);
   CREATE INDEX IF NOT EXISTS idx_events_r_name ON events(router_id, name, ts);
 `);
@@ -48,6 +51,37 @@ const SAMPLE_SEC = Math.max(10, +(process.env.SAMPLE_SECONDS || 60));
 const RETENTION_DAYS = +(process.env.RETENTION_DAYS || 90);
 
 const tx = (fn) => { db.exec('BEGIN'); try { fn(); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } };
+
+// ---- company / app settings ----
+const DEFAULT_SETTINGS = {
+  companyName: 'NodeStats',
+  tagline: '',
+  address: '',
+  contact: '',
+  website: '',
+  footer: '',
+  logo: '',
+};
+const upSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+function getSettings() {
+  const out = { ...DEFAULT_SETTINGS };
+  for (const r of db.prepare('SELECT key, value FROM settings').all()) {
+    if (r.key in DEFAULT_SETTINGS) out[r.key] = r.value;
+  }
+  return out;
+}
+function setSettings(obj) {
+  tx(() => {
+    for (const k of Object.keys(DEFAULT_SETTINGS)) {
+      if (obj[k] !== undefined) {
+        const max = k === 'logo' ? 400000 : 300;
+        const val = String(obj[k] ?? '').trim().slice(0, max);
+        upSetting.run(k, val);
+      }
+    }
+  });
+  return getSettings();
+}
 
 // ---- routers CRUD ----
 const listRouters = () => db.prepare('SELECT * FROM routers ORDER BY id').all();
@@ -156,4 +190,4 @@ setInterval(() => flushAll(false), SAMPLE_SEC * 1000 + 2000).unref();
 process.on('SIGTERM', () => { flushAll(true); process.exit(0); });
 process.on('SIGINT', () => { flushAll(true); process.exit(0); });
 
-module.exports = { listRouters, getRouter, addRouter, updateRouter, deleteRouter, record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS };
+module.exports = { getSettings, setSettings, listRouters, getRouter, addRouter, updateRouter, deleteRouter, record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS };

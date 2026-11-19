@@ -226,7 +226,7 @@ function cleanInput(b, partial) {
   return o;
 }
 const readBody = (req) => new Promise((resolve, reject) => {
-  let s = ''; req.on('data', (c) => { s += c; if (s.length > 65536) req.destroy(); });
+  let s = ''; req.on('data', (c) => { s += c; if (s.length > 524288) req.destroy(); });
   req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(new Error('JSON tidak valid')); } });
 });
 
@@ -242,6 +242,15 @@ http.createServer(async (req, res) => {
   try {
     // CSRF guard: state-changing calls must carry a custom header (forces a CORS preflight for cross-site pages)
     if (req.method !== 'GET' && u.pathname.startsWith('/api/') && req.headers['x-requested-with'] !== 'nodestats') return send(res, 403, { error: 'forbidden' });
+    // company / app settings
+    if (u.pathname === '/api/settings' && req.method === 'GET') return send(res, 200, DB.getSettings());
+    if (u.pathname === '/api/settings' && (req.method === 'POST' || req.method === 'PUT')) {
+      const b = await readBody(req);
+      if (b.logo && !/^(data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,|https?:\/\/)/i.test(String(b.logo).trim())) {
+        return send(res, 400, { error: 'Format logo harus gambar (PNG/JPG/WEBP/SVG) atau URL http(s)' });
+      }
+      return send(res, 200, DB.setSettings(b));
+    }
     // self update (git)
     if (u.pathname === '/api/update/status' && req.method === 'GET') return send(res, 200, await UPD.status());
     if (u.pathname === '/api/update/check' && req.method === 'POST') return send(res, 200, await UPD.check());

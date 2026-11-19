@@ -11,6 +11,7 @@ Dibuat untuk ISP/RT-RW Net dengan ribuan pelanggan PPPoE. Node.js tanpa dependen
 - **Riwayat konek/putus** per user (jumlah putus, jam putus, konek kembali, lama putus). Klik username untuk detail log lengkap.
 - **Router**: CPU, RAM, suhu, uptime, versi.
 - **Responsif** di HP, tampilan tab, pengaturan tampilan terakhir diingat.
+- **Pengaturan Perusahaan & Logo**: ubah nama perusahaan/ISP, tagline, alamat, kontak NOC, catatan footer, serta upload logo (otomatis menjadi logo header & favicon browser, tersimpan aman di database).
 - **Update dari GitHub** lewat satu klik di dashboard.
 
 Backend mem-poll REST API RouterOS di latar belakang lalu menyimpan cache, jadi membuka dashboard tidak menambah beban router.
