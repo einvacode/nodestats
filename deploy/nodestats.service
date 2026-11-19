@@ -1,0 +1,24 @@
+[Unit]
+Description=NodeStats MikroTik Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nodestats
+Group=nodestats
+WorkingDirectory=/opt/nodestats
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server.js
+Environment=HOST=127.0.0.1
+Environment=DATA_DIR=/var/lib/nodestats
+Restart=always
+RestartSec=5
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nodestats
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NodeStats – MikroTik Monitor</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+<header class="sticky top-0 z-10 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="h-9 w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold">N</div>
+      <div>
+        <h1 class="font-semibold leading-tight">NodeStats <span id="identity" class="text-slate-400 font-normal"></span></h1>
+        <p id="routerInfo" class="text-xs text-slate-500">memuat…</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <span id="demoBadge" class="hidden px-2 py-1 rounded bg-amber-500/20 text-amber-300">DEMO</span>
+      <span id="statusBadge" class="px-2 py-1 rounded bg-slate-800 text-slate-400">…</span>
+      <span id="live" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span><span id="updated" class="text-slate-500"></span>
+    </div>
+  </div>
+  <nav id="tabs" class="max-w-7xl mx-auto px-3 sm:px-4 flex gap-1 overflow-x-auto text-sm"></nav>
+</header>
+
+<main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+  <div id="errorBox" class="hidden rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 px-4 py-3 text-sm"></div>
+
+  <!-- KPI cards -->
+  <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl sm:text-3xl font-bold text-emerald-400">-</p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl sm:text-3xl font-bold text-rose-400">-</p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">Total Aktif (secret)</p><p id="kEnabled" class="text-2xl sm:text-3xl font-bold">-</p><p id="kDisabled" class="text-xs text-slate-500"></p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <p class="text-xs text-slate-500">Rasio Online</p><p id="kPct" class="text-2xl sm:text-3xl font-bold text-sky-400">-</p>
+      <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <p class="text-xs text-slate-500">CPU</p><p id="kCpu" class="text-2xl sm:text-3xl font-bold">-</p><p id="kCpuSub" class="text-xs text-slate-500"></p>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <p class="text-xs text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl sm:text-3xl font-bold">-</p><p id="kTemp" class="text-xs text-slate-500"></p>
+    </div>
+  </section>
+
+  <div data-tab="grafik" class="space-y-4 sm:space-y-6">
+  <!-- range -->
+  <section class="flex items-center gap-2 flex-wrap">
+    <div id="rangeBtns" class="inline-flex rounded-lg bg-slate-900 border border-slate-800 p-1 text-sm overflow-x-auto"></div>
+    <input id="dayPick" type="date" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm [color-scheme:dark]">
+    <span id="rangeInfo" class="text-xs text-slate-500"></span>
+  </section>
+
+  <!-- charts -->
+  <section class="grid lg:grid-cols-2 gap-3 sm:gap-4">
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <h2 class="text-sm font-medium mb-2">Traffic Total Fisik (Mbps)</h2><div class="h-44 sm:h-56"><canvas id="cTraffic"></canvas></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <h2 class="text-sm font-medium mb-2">PPPoE Online</h2><div class="h-44 sm:h-56"><canvas id="cOnline"></canvas></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <h2 class="text-sm font-medium mb-2">CPU Load (%)</h2><div class="h-44 sm:h-56"><canvas id="cCpu"></canvas></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-medium">Traffic Interface / VLAN (Mbps)</h2>
+        <select id="ifSelect" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs"></select>
+      </div>
+      <div class="h-44 sm:h-56"><canvas id="cIf"></canvas></div>
+    </div>
+  </section>
+
+  <!-- profiles -->
+  <section class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+    <h2 class="text-sm font-medium mb-3">Online per Profile</h2>
+    <div id="profiles" class="flex flex-wrap gap-2"></div>
+  </section>
+
+  </div>
+  <div data-tab="iface" class="space-y-4 sm:space-y-6">
+  <!-- interfaces -->
+  <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div class="p-4 flex items-center justify-between gap-2 flex-wrap">
+      <h2 class="text-sm font-medium">Interface &amp; VLAN</h2>
+      <input id="ifFilter" placeholder="Filter nama / tipe…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm w-full sm:w-56 focus:outline-none focus:border-sky-500">
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-xs text-slate-500 bg-slate-950/50"><tr>
+          <th class="text-left px-4 py-2">Status</th><th class="text-left px-4 py-2">Nama</th><th class="text-left px-4 py-2 hidden sm:table-cell">Tipe</th>
+          <th class="text-right px-4 py-2">Rx</th><th class="text-right px-4 py-2">Tx</th><th class="text-right px-4 py-2 hidden md:table-cell">Error</th><th class="text-right px-4 py-2 hidden md:table-cell">Drop</th><th class="text-left px-4 py-2 hidden lg:table-cell">Komentar</th>
+        </tr></thead>
+        <tbody id="ifBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  </div>
+  <div data-tab="pppoe" class="space-y-4 sm:space-y-6">
+  <!-- pppoe table -->
+  <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div class="p-4 flex items-center justify-between gap-2 flex-wrap">
+      <h2 class="text-sm font-medium">Pelanggan PPPoE <span id="pTotal" class="text-slate-500 font-normal"></span></h2>
+      <div class="flex gap-2 w-full sm:w-auto">
+        <select id="pStatus" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
+          <option value="all">Semua</option><option value="online">Online</option><option value="offline">Offline</option>
+        </select>
+        <input id="pSearch" placeholder="Cari username / IP / MAC…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm w-full sm:w-64 focus:outline-none focus:border-sky-500">
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-xs text-slate-500 bg-slate-950/50"><tr>
+          <th class="text-left px-4 py-2">Status</th><th class="text-left px-4 py-2">Username</th><th class="text-left px-4 py-2 hidden sm:table-cell">Profile</th>
+          <th class="text-left px-4 py-2">IP</th><th class="text-left px-4 py-2 hidden md:table-cell">MAC</th><th class="text-left px-4 py-2 hidden sm:table-cell">Uptime</th>
+        </tr></thead>
+        <tbody id="pBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+    <div class="p-3 flex items-center justify-between text-sm">
+      <button id="pPrev" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">‹ Prev</button>
+      <span id="pPage" class="text-slate-500"></span>
+      <button id="pNext" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Next ›</button>
+    </div>
+  </section>
+  </div>
+  <div data-tab="riwayat" class="space-y-4 sm:space-y-6">
+  <!-- events -->
+  <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div class="p-4 space-y-3">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h2 class="text-sm font-medium">Riwayat Putus / Konek PPPoE <span id="evTotal" class="text-slate-500 font-normal"></span></h2>
+        <div id="evSum" class="text-xs text-slate-400 flex gap-3 flex-wrap"></div>
+      </div>
+      <div class="flex gap-2 flex-wrap items-center">
+        <input id="evDate" type="date" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm [color-scheme:dark]">
+        <select id="evSpan" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
+          <option value="1">1 hari</option><option value="7">7 hari sampai tanggal ini</option><option value="30">30 hari sampai tanggal ini</option>
+        </select>
+        <input id="evSearch" placeholder="Cari username…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm flex-1 min-w-[10rem] focus:outline-none focus:border-sky-500">
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead id="evHead" class="text-xs text-slate-500 bg-slate-950/50"></thead>
+        <tbody id="evBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+    <div class="p-3 flex items-center justify-between text-sm">
+      <button id="evPrev" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">‹ Prev</button>
+      <span id="evPage" class="text-slate-500"></span>
+      <button id="evNext" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Next ›</button>
+    </div>
+  </section>
+  </div>
+</main>
+
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
+  <div class="bg-slate-900 border border-slate-700 w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl">
+    <div class="p-4 border-b border-slate-800 flex items-start justify-between gap-3">
+      <div><h3 id="mName" class="font-semibold break-all"></h3><p id="mInfo" class="text-xs text-slate-400 mt-1"></p></div>
+      <button id="mClose" class="text-slate-400 hover:text-white text-2xl leading-none px-2">×</button>
+    </div>
+    <div class="px-4 pt-3 flex items-center gap-2 flex-wrap">
+      <select id="mRange" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
+        <option value="1">24 jam</option><option value="7" selected>7 hari</option><option value="30">30 hari</option><option value="90">90 hari</option>
+      </select>
+      <div id="mStats" class="text-xs text-slate-400 flex gap-3 flex-wrap"></div>
+    </div>
+    <div id="mBody" class="p-4 overflow-y-auto text-sm space-y-1"></div>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmtBps = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' Gbps' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' Mbps' : b >= 1e3 ? (b / 1e3).toFixed(0) + ' Kbps' : Math.round(b) + ' bps';
+const fmtN = (n) => Number(n).toLocaleString('id-ID');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = '#1e293b';
+const mk = (id, datasets, yFmt) => new Chart($(id), {
+  type: 'line', data: { labels: [], datasets: datasets.map(([label, color]) => ({ label, borderColor: color, backgroundColor: color + '22', fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, data: [] })) },
+  options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+    scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: true, ticks: { callback: yFmt || ((v) => v) } } }, plugins: { legend: { labels: { boxWidth: 10 } } } },
+});
+const mbps = (v) => (v / 1e6).toFixed(0);
+const cTraffic = mk('cTraffic', [['Rx', '#38bdf8'], ['Tx', '#34d399']], mbps);
+const cOnline = mk('cOnline', [['Online', '#34d399'], ['Offline', '#fb7185']]);
+const cCpu = mk('cCpu', [['CPU %', '#f59e0b']]); cCpu.options.scales.y.max = 100;
+const cIf = mk('cIf', [['Rx', '#38bdf8'], ['Tx', '#34d399']], mbps);
+
+function setChart(c, labels, ...series) {
+  c.data.labels = labels; series.forEach((s, i) => (c.data.datasets[i].data = s)); c.update();
+}
+const ST = JSON.parse(localStorage.getItem('nodestats') || '{}');
+const save = (o) => { Object.assign(ST, o); localStorage.setItem('nodestats', JSON.stringify(ST)); };
+let hist = null, ifaces = [];
+const RANGES = [['live', 'Live'], ['6h', '6 jam'], ['24h', '24 jam'], ['7d', '7 hari'], ['30d', '30 hari']];
+let range = ST.range || 'live', dayStr = ST.dayStr || '';
+const SEC = { '6h': 6 * 3600, '24h': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
+function drawRangeBtns() {
+  $('rangeBtns').innerHTML = RANGES.map(([k, l]) => `<button data-r="${k}" class="px-3 py-1 rounded-md whitespace-nowrap ${range === k ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-slate-200'}">${l}</button>`).join('');
+  $('dayPick').classList.toggle('border-sky-500', range === 'day');
+}
+$('rangeBtns').onclick = (e) => { const r = e.target.dataset.r; if (!r) return; range = r; dayStr = ''; $('dayPick').value = ''; save({ range, dayStr }); drawRangeBtns(); loadHistory(); };
+$('dayPick').max = new Date().toLocaleDateString('sv');
+$('dayPick').onchange = (e) => { if (!e.target.value) return; range = 'day'; dayStr = e.target.value; save({ range, dayStr }); drawRangeBtns(); loadHistory(); $('evDate').value = dayStr; evPage = 1; loadEvents(); };
+function dayBounds(s) { const d = new Date(s + 'T00:00:00'); return [Math.floor(d / 1000), Math.floor(d / 1000) + 86400]; }
+function rangeBounds() {
+  const now = Math.floor(Date.now() / 1000);
+  if (range === 'day') return dayBounds(dayStr);
+  return [now - SEC[range], now];
+}
+function fmtLabel(ms) {
+  const d = new Date(ms);
+  if (range === 'live' || range === '6h' || range === '24h' || range === 'day') return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+async function loadHistory() {
+  const sel = $('ifSelect');
+  if (range === 'live') {
+    hist = await (await fetch('/api/history')).json();
+    $('rangeInfo').textContent = 'real-time, 1 jam terakhir';
+    const labels = hist.t.map((t) => new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    setChart(cTraffic, labels, hist.rx, hist.tx); setChart(cOnline, labels, hist.online, []); setChart(cCpu, labels, hist.cpu);
+    const h = hist.ifaces[sel.value];
+    if (h) setChart(cIf, labels.slice(-h.rx.length), h.rx, h.tx);
+    return;
+  }
+  const [from, to] = rangeBounds();
+  const d = await (await fetch(`/api/history?from=${from}&to=${to}&iface=${encodeURIComponent(sel.value)}`)).json();
+  hist = d;
+  $('rangeInfo').textContent = d.t.length ? `${new Date(from * 1000).toLocaleString('id-ID')} – ${new Date(to * 1000).toLocaleString('id-ID')} · rata-rata per ${Math.round(d.bucket / 60)} menit` : 'Belum ada data pada rentang ini';
+  const labels = d.t.map(fmtLabel);
+  setChart(cTraffic, labels, d.rx, d.tx); setChart(cOnline, labels, d.online, d.offline); setChart(cCpu, labels, d.cpu);
+  const h = d.ifaces[sel.value];
+  if (h) setChart(cIf, h.t.map(fmtLabel), h.rx, h.tx);
+}
+$('ifSelect').onchange = () => { save({ iface: $('ifSelect').value }); loadHistory(); };
+$('dayPick').value = range === 'day' ? dayStr : '';
+drawRangeBtns();
+
+function renderIfaces() {
+  const f = $('ifFilter').value.toLowerCase();
+  $('ifBody').innerHTML = ifaces.filter((i) => `${i.name} ${i.type} ${i.comment}`.toLowerCase().includes(f)).map((i) => {
+    const up = i.disabled ? ['bg-slate-600', 'disabled'] : i.running ? ['bg-emerald-400', 'up'] : ['bg-rose-500', 'down'];
+    return `<tr class="hover:bg-slate-800/40"><td class="px-4 py-2"><span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full ${up[0]}"></span>${up[1]}</span></td>
+      <td class="px-4 py-2 font-medium break-all">${esc(i.name)}</td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(i.type)}</td>
+      <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.rxbps)}</td><td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.txbps)}</td>
+      <td class="px-4 py-2 text-right hidden md:table-cell ${i.errors ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.errors)}</td>
+      <td class="px-4 py-2 text-right hidden md:table-cell ${i.drops ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.drops)}</td>
+      <td class="px-4 py-2 text-slate-500 hidden lg:table-cell">${esc(i.comment)}</td></tr>`;
+  }).join('');
+}
+$('ifFilter').value = ST.ifFilter || '';
+$('ifFilter').oninput = () => { save({ ifFilter: $('ifFilter').value }); renderIfaces(); };
+
+async function loadSummary() {
+  const s = await (await fetch('/api/summary')).json();
+  $('identity').textContent = s.identity ? '· ' + s.identity : '';
+  $('demoBadge').classList.toggle('hidden', !s.demo);
+  $('routerInfo').textContent = [s.router.board, 'ROS ' + (s.router.version || '?'), 'uptime ' + (s.router.uptime || '?')].join(' · ');
+  const ok = s.updated && !s.error;
+  $('statusBadge').textContent = ok ? '● Terhubung' : '● Terputus';
+  $('statusBadge').className = 'px-2 py-1 rounded ' + (ok ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300');
+  $('updated').textContent = s.updated ? new Date(s.updated).toLocaleTimeString('id-ID') : '';
+  $('errorBox').classList.toggle('hidden', !s.error); $('errorBox').textContent = s.error ? 'Gagal polling router: ' + s.error : '';
+  const p = s.pppoe;
+  $('kOnline').textContent = fmtN(p.online); $('kOffline').textContent = fmtN(p.offline);
+  $('kEnabled').textContent = fmtN(p.enabled); $('kDisabled').textContent = fmtN(p.disabled) + ' secret disabled';
+  $('kPct').textContent = p.pct + '%'; $('kPctBar').style.width = p.pct + '%';
+  $('kCpu').textContent = s.router.cpu + '%'; $('kCpu').className = 'text-2xl sm:text-3xl font-bold ' + (s.router.cpu > 80 ? 'text-rose-400' : s.router.cpu > 50 ? 'text-amber-400' : '');
+  $('kCpuSub').textContent = s.router.cpuCount + ' core';
+  $('kMem').textContent = s.router.memUsedPct + '%';
+  $('kTemp').textContent = (s.router.temp != null ? s.router.temp + '°C · ' : '') + (s.router.memTotal / 1073741824).toFixed(0) + ' GB RAM';
+  $('profiles').innerHTML = Object.entries(p.profiles).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+    `<span class="px-3 py-1 rounded-full bg-slate-800 text-sm">${esc(k)} <b class="text-sky-400">${fmtN(v)}</b></span>`).join('');
+  ifaces = s.ifaces; renderIfaces();
+  const sel = $('ifSelect'), names = s.ifaces.map((i) => i.name);
+  if (sel.options.length !== names.length) { const cur = sel.value; sel.innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join(''); const want = cur || ST.iface; if (names.includes(want)) sel.value = want; }
+}
+
+let page = ST.page || 1, timer;
+$('pStatus').value = ST.pStatus || 'all'; $('pSearch').value = ST.pSearch || '';
+async function loadPppoe() {
+  save({ page, pStatus: $('pStatus').value, pSearch: $('pSearch').value });
+  const q = new URLSearchParams({ page, size: 50, status: $('pStatus').value, search: $('pSearch').value });
+  const d = await (await fetch('/api/pppoe?' + q)).json();
+  if (!d.rows.length && page > 1) { page = 1; return loadPppoe(); }
+  $('pTotal').textContent = `(${fmtN(d.total)})`;
+  $('pBody').innerHTML = d.rows.map((r) => `<tr class="hover:bg-slate-800/40">
+    <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${r.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.status}</span></td>
+    <td class="px-4 py-2 font-medium break-all"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left">${esc(r.name)}</button><div class="sm:hidden text-xs text-slate-500">${esc(r.profile)} · ${esc(r.uptime || '-')}</div></td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(r.profile)}</td>
+    <td class="px-4 py-2 tabular-nums">${esc(r.address || '-')}</td><td class="px-4 py-2 font-mono text-xs text-slate-400 hidden md:table-cell">${esc(r.mac || '-')}</td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(r.uptime || '-')}</td></tr>`).join('');
+  const pages = Math.max(1, Math.ceil(d.total / d.size));
+  $('pPage').textContent = `Halaman ${d.page} / ${pages}`;
+  $('pPrev').disabled = page <= 1; $('pNext').disabled = page >= pages;
+}
+$('pPrev').onclick = () => { page--; loadPppoe(); };
+$('pNext').onclick = () => { page++; loadPppoe(); };
+$('pStatus').onchange = () => { page = 1; loadPppoe(); };
+$('pSearch').oninput = () => { clearTimeout(timer); timer = setTimeout(() => { page = 1; loadPppoe(); }, 300); };
+
+let evPage = 1, evTimer;
+$('evDate').max = new Date().toLocaleDateString('sv');
+$('evDate').value = ST.evDate || $('evDate').max; $('evSpan').value = ST.evSpan || '1'; $('evSearch').value = ST.evSearch || '';
+function drawEvHead() {
+  $('evHead').innerHTML = '<tr><th class="text-left px-4 py-2">Username</th><th class="text-right px-4 py-2">Putus</th><th class="text-left px-4 py-2">Terakhir putus</th><th class="text-left px-4 py-2 hidden sm:table-cell">Konek kembali</th><th class="text-left px-4 py-2">Status</th></tr>';
+}
+const fmtDT = (ms) => new Date(ms).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const fmtDur = (ms) => { let s = Math.max(0, Math.round(ms / 1000)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); s %= 60;
+  return d ? `${d}h ${h}j` : h ? `${h}j ${m}m` : m ? `${m}m ${s}d` : `${s}d`; };
+function evBounds() {
+  const [s0, e0] = dayBounds($('evDate').value), span = +$('evSpan').value;
+  return [e0 - span * 86400, e0];
+}
+async function loadEvents() {
+  const [from, to] = evBounds(), search = $('evSearch').value;
+  save({ evDate: $('evDate').value, evSpan: $('evSpan').value, evSearch: search });
+  const q = new URLSearchParams({ from, to, page: evPage, size: 50, search });
+  const d = await (await fetch('/api/flaps?' + q)).json();
+  if (!d.rows.length && evPage > 1) { evPage = 1; return loadEvents(); }
+  $('evSum').innerHTML = `<span class="text-rose-300">Total putus: ${fmtN(d.totalDowns || 0)}×</span>`;
+  $('evTotal').textContent = `(${fmtN(d.total)} user)`;
+  const empty = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Tidak ada data</td></tr>`;
+    $('evBody').innerHTML = d.rows.length ? d.rows.map((r) => {
+      const back = r.lastUp && r.lastUp >= r.lastDown ? r.lastUp : null;
+      return `<tr class="hover:bg-slate-800/40"><td class="px-4 py-2 font-medium break-all"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left">${esc(r.name)}</button><div class="sm:hidden text-xs text-slate-500">kembali: ${back ? fmtDT(back) : '-'}</div></td>
+        <td class="px-4 py-2 text-right"><span class="px-2 py-0.5 rounded text-xs font-semibold ${r.downs >= 5 ? 'bg-rose-500/30 text-rose-200' : 'bg-amber-500/20 text-amber-300'}">${r.downs}×</span></td>
+        <td class="px-4 py-2 whitespace-nowrap text-slate-400">${fmtDT(r.lastDown)}</td>
+        <td class="px-4 py-2 whitespace-nowrap text-slate-400 hidden sm:table-cell">${back ? fmtDT(back) : '-'}</td>
+        <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${r.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.online ? 'online' : 'offline'}</span></td></tr>`;
+    }).join('') : empty;
+  const pages = Math.max(1, Math.ceil(d.total / 50));
+  $('evPage').textContent = `Halaman ${evPage} / ${pages}`; $('evPrev').disabled = evPage <= 1; $('evNext').disabled = evPage >= pages;
+}
+drawEvHead();
+$('evPrev').onclick = () => { evPage--; loadEvents(); };
+$('evNext').onclick = () => { evPage++; loadEvents(); };
+$('evDate').onchange = () => { evPage = 1; loadEvents(); };
+$('evSpan').onchange = () => { evPage = 1; loadEvents(); };
+$('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; loadEvents(); }, 300); };
+
+const TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat']];
+let tab = TABS.some(([k]) => k === ST.tab) ? ST.tab : 'grafik';
+function showTab() {
+  $('tabs').innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="px-4 py-2 whitespace-nowrap border-b-2 ${tab === k ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'}">${esc(l)}</button>`).join('');
+  document.querySelectorAll('[data-tab]').forEach((el) => el.classList.toggle('hidden', el.dataset.tab !== tab));
+  [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.resize());
+}
+$('tabs').onclick = (e) => { const k = e.target.dataset.t; if (!k) return; tab = k; save({ tab }); showTab(); window.scrollTo(0, 0); n = 0; tick(); };
+showTab();
+
+let mUser = '';
+async function openUser(name) {
+  if (name) mUser = name;
+  $('modal').classList.remove('hidden'); document.body.classList.add('overflow-hidden');
+  $('mName').textContent = mUser; $('mBody').innerHTML = '<p class="text-slate-500">Memuat…</p>';
+  const now = Math.floor(Date.now() / 1000), from = now - $('mRange').value * 86400;
+  const d = await (await fetch(`/api/user?name=${encodeURIComponent(mUser)}&from=${from}&to=${now + 60}`)).json();
+  $('mInfo').innerHTML = `<span class="px-2 py-0.5 rounded ${d.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${d.online ? 'online' : 'offline'}</span> `
+    + [d.profile && 'profile ' + d.profile, d.address, d.mac, d.uptime && 'uptime ' + d.uptime].filter(Boolean).map(esc).join(' · ');
+  const asc = [...d.events].reverse();               // oldest -> newest
+  let downs = 0, downMs = 0;
+  const rows = asc.map((e, k) => {
+    let note = '';
+    if (e.event === 'down') {
+      downs++;
+      const nx = asc.slice(k + 1).find((x) => x.event === 'up');
+      if (nx) { downMs += nx.ts - e.ts; note = 'putus ' + fmtDur(nx.ts - e.ts); } else { downMs += Date.now() - e.ts; note = d.online ? '' : 'masih putus'; }
+    }
+    return { ...e, note };
+  }).reverse();                                       // newest first
+  $('mStats').innerHTML = `<span class="text-rose-300">Putus: ${downs}×</span><span>Total putus: ${downs ? fmtDur(downMs) : '-'}</span><span>Kejadian: ${rows.length}</span>`;
+  let day = '', html = '';
+  for (const r of rows) {
+    const dt = new Date(r.ts), dl = dt.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    if (dl !== day) { day = dl; html += `<div class="pt-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">${dl}</div>`; }
+    html += `<div class="flex items-center gap-3 py-1.5 border-b border-slate-800/60"><span class="tabular-nums text-slate-300 w-20 shrink-0">${dt.toLocaleTimeString('id-ID')}</span>
+      <span class="px-2 py-0.5 rounded text-xs ${r.event === 'up' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.event === 'up' ? 'konek' : 'putus'}</span>
+      <span class="text-xs text-slate-500">${r.note}</span></div>`;
+  }
+  $('mBody').innerHTML = html || '<p class="text-slate-500">Tidak ada log pada rentang ini.</p>';
+}
+const closeModal = () => { $('modal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
+$('mClose').onclick = closeModal;
+$('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+$('mRange').onchange = () => openUser();
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-user]'); if (b) openUser(b.dataset.user); });
+
+let n = 0;
+async function tick() {
+  if (document.hidden) return;
+  try {
+    await loadSummary();
+    const jobs = [];
+    if (tab === 'pppoe') jobs.push(loadPppoe());
+    if (tab === 'grafik' && (range === 'live' || n % 12 === 0)) jobs.push(loadHistory());
+    if (tab === 'riwayat' && n % 6 === 0) jobs.push(loadEvents());
+    await Promise.all(jobs); n++;
+    $('live').className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
+  } catch (e) { console.error(e); $('live').className = 'h-2 w-2 rounded-full bg-rose-500'; }
+}
+tick().then(() => { if (ST.scroll) window.scrollTo(0, ST.scroll); });
+let sT; window.addEventListener('scroll', () => { clearTimeout(sT); sT = setTimeout(() => save({ scroll: Math.round(window.scrollY) }), 150); }, { passive: true });
+setInterval(tick, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+</script>
+</body>
+</html>
