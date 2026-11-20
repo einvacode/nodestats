@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nodestats-pwa-v1';
+const CACHE_NAME = 'nodestats-pwa-v2';
 const SHELL_ASSETS = ['/', '/manifest.json', '/pwa-icon.svg'];
 
 self.addEventListener('install', (e) => {
