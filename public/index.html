@@ -684,7 +684,9 @@ function ensureAudio() {
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   return audioCtx;
 }
-document.addEventListener('click', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {}); }, { passive: true });
+['click', 'keydown', 'touchstart'].forEach((ev) => {
+  document.addEventListener(ev, () => { if (popSoundOn) ensureAudio(); }, { passive: true });
+});
 
 function playAlarmBeep() {
   try {
@@ -719,12 +721,15 @@ updateSoundBtn();
 function syncAlarmLoop() {
   const downList = pops.filter((p) => p.enabled && p.status === 'down');
   const sig = downList.map((p) => p.id).sort((a, b) => a - b).join(',');
+  const baseTitle = (cfg.companyName || 'NodeStats') + (cfg.tagline ? ' – ' + cfg.tagline : ' – MikroTik Monitor');
   if (!downList.length) {
     popMutedSig = '';
     if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
     $('popAlarmBanner').classList.add('hidden');
+    document.title = baseTitle;
     return;
   }
+  document.title = `🚨 (${downList.length} POP DOWN) ${baseTitle}`;
   $('popAlarmBanner').classList.remove('hidden');
   $('popAlarmCount').textContent = `${downList.length} POP tidak merespons ping`;
   $('popAlarmList').innerHTML = downList.map((p) => {
@@ -1212,17 +1217,19 @@ loadUpd(); setInterval(loadUpd, 10 * 60 * 1000);
 
 let n = 0;
 async function tick() {
-  if (document.hidden) return;
   try {
     await loadRouters();
     if (!rid) { $('routerInfo').textContent = 'Belum ada router'; $('statusBadge').textContent = '● -'; if (!ST.askedAdd) { save({ askedAdd: 1 }); openMgr(); } return; }
     await loadSummary();
-    const jobs = [];
-    if (tab === 'pppoe') jobs.push(loadPppoe());
-    if (tab === 'grafik' && (range === 'live' || n % 12 === 0)) jobs.push(loadHistory());
-    if (tab === 'riwayat' && n % 6 === 0) jobs.push(loadEvents());
-    if (tab === 'pop' && n % 2 === 0) jobs.push(loadPops());
-    await Promise.all(jobs); n++;
+    if (!document.hidden) {
+      const jobs = [];
+      if (tab === 'pppoe') jobs.push(loadPppoe());
+      if (tab === 'grafik' && (range === 'live' || n % 12 === 0)) jobs.push(loadHistory());
+      if (tab === 'riwayat' && n % 6 === 0) jobs.push(loadEvents());
+      if (tab === 'pop' && n % 2 === 0) jobs.push(loadPops());
+      await Promise.all(jobs);
+    }
+    n++;
     $('live').className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
   } catch (e) { console.error(e); $('live').className = 'h-2 w-2 rounded-full bg-rose-500'; }
 }
