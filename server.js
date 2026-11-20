@@ -27,26 +27,66 @@ const UPD = require('./update');
 const HIST_MAX = 360; // 360 * 10s = 1 hour
 
 // ---- RouterOS REST ----
-function rosGet(r, p) {
+function rosReq(r, method, p, payload, timeout = 30000) {
   return new Promise((resolve, reject) => {
     const lib = r.scheme === 'https' ? https : http;
+    const data = payload ? Buffer.from(JSON.stringify(payload)) : null;
+    const headers = { Accept: 'application/json', Connection: 'close' };
+    if (data) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = data.length; }
     const req = lib.request({
-      host: r.host, port: r.port, path: '/rest' + p, method: 'GET', agent: false, timeout: 30000,
-      auth: `${r.user}:${r.pass}`, rejectUnauthorized: !r.insecure,
-      headers: { Accept: 'application/json', Connection: 'close' },
+      host: r.host, port: r.port, path: '/rest' + p, method, agent: false, timeout,
+      auth: `${r.user}:${r.pass}`, rejectUnauthorized: !r.insecure, headers,
     }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const body = Buffer.concat(chunks).toString();
         if (res.statusCode >= 400) return reject(new Error(`${res.statusCode} ${p}: ${body.slice(0, 200)}`));
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+        try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); }
       });
     });
     req.on('timeout', () => req.destroy(new Error('timeout ' + p)));
     req.on('error', reject);
+    if (data) req.write(data);
     req.end();
   });
+}
+const rosGet = (r, p) => rosReq(r, 'GET', p);
+const rosPost = (r, p, body, timeout = 10000) => rosReq(r, 'POST', p, body, timeout);
+
+function parseRosTimeMs(s) {
+  if (!s) return null;
+  const str = String(s);
+  let ms = 0, ok = false;
+  const sec = str.match(/(\d+(?:\.\d+)?)s/);
+  const msec = str.match(/(\d+(?:\.\d+)?)ms/);
+  const usec = str.match(/(\d+(?:\.\d+)?)us/);
+  if (sec) { ms += parseFloat(sec[1]) * 1000; ok = true; }
+  if (msec) { ms += parseFloat(msec[1]); ok = true; }
+  if (usec) { ms += parseFloat(usec[1]) / 1000; ok = true; }
+  if (!ok && !isNaN(parseFloat(str))) return +parseFloat(str).toFixed(2);
+  return ok ? +ms.toFixed(2) : null;
+}
+
+async function pingViaRouter(r, ip, isDemo) {
+  if (isDemo) {
+    const down = /\.99$|^down/i.test(ip);
+    return down ? { up: false, rttMs: null, lossPct: 100 } : { up: true, rttMs: +(1.2 + Math.random() * 4).toFixed(1), lossPct: 0 };
+  }
+  const runPing = async (count) => {
+    const res = await rosPost(r, '/ping', { address: ip, count: String(count), interval: '250ms' }, 8000);
+    const arr = Array.isArray(res) ? res : [];
+    const last = arr[arr.length - 1] || {};
+    const recv = +last.received || arr.filter((x) => x.time || x['avg-rtt']).length;
+    const sent = +last.sent || arr.length || count;
+    const rttMs = parseRosTimeMs(last['avg-rtt'] || last.time);
+    const lossPct = sent ? Math.round(((sent - recv) / sent) * 100) : 100;
+    return { up: recv > 0, rttMs, lossPct };
+  };
+  const first = await runPing(2);
+  if (first.up) return first;
+  // Retry once on 100% loss to avoid false alarm on transient single drop
+  return await runPing(2);
 }
 
 // ---- demo data (router with host "demo") ----
@@ -90,10 +130,63 @@ class Collector {
     this.secrets = []; this.secretsUpdated = 0; this.active = []; this.ifaces = [];
     this.prevIf = new Map(); this.prevActive = null;
     this.hist = { t: [], online: [], cpu: [], rx: [], tx: [] }; this.ifHist = new Map();
+    this.popStates = new Map(); this.pollingPops = false;
   }
-  start() { this.stopped = false; this.pollSlow().then(() => this.pollFast()); }
+  start() { this.stopped = false; this.pollSlow().then(() => { this.pollFast(); this.pollPopsLoop(); }); }
   stop() { this.stopped = true; this.timers.forEach(clearTimeout); this.timers = []; DB.forget(this.id); }
   later(fn, ms) { if (!this.stopped) this.timers.push(setTimeout(fn, ms)); }
+
+  async pollOnePop(p) {
+    if (!p.enabled) {
+      this.popStates.set(p.id, { status: 'disabled', rttMs: null, lossPct: 0, lastCheck: Date.now(), lastChange: null, downSince: null });
+      return;
+    }
+    const prev = this.popStates.get(p.id);
+    const now = Date.now();
+    try {
+      const res = await pingViaRouter(this.r, p.ip, !!this.demo);
+      const status = res.up ? 'up' : 'down';
+      const changed = prev && (prev.status === 'up' || prev.status === 'down') && prev.status !== status;
+      const lastChange = changed ? now : (prev?.lastChange || now);
+      const downSince = status === 'down' ? (prev?.status === 'down' ? prev.downSince : now) : null;
+      this.popStates.set(p.id, { status, rttMs: res.rttMs, lossPct: res.lossPct, lastCheck: now, lastChange, downSince, error: null });
+      if (changed || (!prev && status === 'down')) {
+        DB.addPopEvent({
+          pop_id: p.id, router_id: this.id, ts: Math.floor(now / 1000),
+          name: p.name, ip: p.ip, event: status,
+          detail: status === 'up' ? (res.rttMs != null ? `Reply ${res.rttMs} ms` : 'Reply OK') : 'Request timeout (100% loss)',
+        });
+      }
+    } catch (e) {
+      this.popStates.set(p.id, {
+        status: prev?.status || 'pending', rttMs: null, lossPct: 100,
+        lastCheck: now, lastChange: prev?.lastChange || now, downSince: prev?.downSince || null, error: e.message,
+      });
+    }
+  }
+  async pollPops() {
+    if (this.stopped || this.pollingPops) return;
+    this.pollingPops = true;
+    try {
+      const pops = DB.listPops(this.id);
+      for (const p of pops) {
+        if (this.stopped) break;
+        await this.pollOnePop(p);
+      }
+    } catch (e) { console.error(`[${this.r.name}] pops`, e.message); }
+    this.pollingPops = false;
+  }
+  async pollPopsLoop() {
+    if (this.stopped) return;
+    await this.pollPops();
+    this.later(() => this.pollPopsLoop(), CFG.fast);
+  }
+  popsList() {
+    return DB.listPops(this.id).map((p) => {
+      const st = this.popStates.get(p.id) || { status: p.enabled ? 'pending' : 'disabled', rttMs: null, lossPct: 0, lastCheck: 0, lastChange: null, downSince: null };
+      return { id: p.id, router_id: p.router_id, name: p.name, ip: p.ip, location: p.location, notes: p.notes, enabled: !!p.enabled, ...st };
+    });
+  }
 
   async pollFast() {
     if (this.stopped) return;
@@ -174,7 +267,7 @@ class Collector {
         memUsedPct: total ? Math.round(((total - free) / total) * 100) : 0, memTotal: total, temp: temp ? +temp.value : null },
       pppoe: { secrets: this.secrets.length, enabled: enabled.length, disabled: this.secrets.length - enabled.length, online: this.active.length,
         offline, pct: enabled.length ? +((this.active.length / enabled.length) * 100).toFixed(1) : 0, profiles },
-      secretsUpdated: this.secretsUpdated, ifaces: this.ifaces,
+      secretsUpdated: this.secretsUpdated, ifaces: this.ifaces, pops: this.popsList(),
     };
   }
   pppoe(q) {
@@ -314,6 +407,47 @@ http.createServer(async (req, res) => {
           page: Math.max(1, +q.get('page') || 1), size: Math.min(200, +q.get('size') || 50) });
         r.rows.forEach((x) => { x.online = c.prevActive ? c.prevActive.has(x.name) : null; });
         return send(res, 200, r);
+      }
+      if (u.pathname === '/api/pops' && req.method === 'GET') {
+        return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
+      }
+      if (u.pathname === '/api/pops' && req.method === 'POST') {
+        const b = await readBody(req);
+        const name = String(b.name || '').trim().slice(0, 120);
+        const ip = String(b.ip || '').trim().slice(0, 120);
+        if (!name || !ip) return send(res, 400, { error: 'Nama POP dan IP wajib diisi' });
+        const row = DB.addPop({
+          router_id: c.id, name, ip,
+          location: String(b.location || '').trim().slice(0, 120),
+          notes: String(b.notes || '').trim().slice(0, 200),
+          enabled: b.enabled !== false,
+        });
+        await c.pollOnePop(row);
+        return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
+      }
+      if (u.pathname === '/api/pops/check' && req.method === 'POST') {
+        await c.pollPops();
+        return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
+      }
+      const mp = u.pathname.match(/^\/api\/pops\/(\d+)$/);
+      if (mp && req.method === 'PUT') {
+        const id = +mp[1], b = await readBody(req), cur = DB.getPop(id);
+        if (!cur) return send(res, 404, { error: 'POP tidak ditemukan' });
+        const upd = {};
+        if (b.name !== undefined) upd.name = String(b.name).trim().slice(0, 120);
+        if (b.ip !== undefined) upd.ip = String(b.ip).trim().slice(0, 120);
+        if (b.location !== undefined) upd.location = String(b.location).trim().slice(0, 120);
+        if (b.notes !== undefined) upd.notes = String(b.notes).trim().slice(0, 200);
+        if (b.enabled !== undefined) upd.enabled = !!b.enabled;
+        const row = DB.updatePop(id, upd);
+        await c.pollOnePop(row);
+        return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
+      }
+      if (mp && req.method === 'DELETE') {
+        const id = +mp[1];
+        c.popStates.delete(id);
+        DB.deletePop(id);
+        return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
       }
       return send(res, 404, { error: 'unknown endpoint' });
     }

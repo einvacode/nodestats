@@ -36,8 +36,18 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS pops (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, router_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL, ip TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS pop_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, pop_id INTEGER NOT NULL, router_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL, name TEXT NOT NULL, ip TEXT NOT NULL, event TEXT NOT NULL, detail TEXT NOT NULL DEFAULT ''
+  );
   CREATE INDEX IF NOT EXISTS idx_events_r_ts ON events(router_id, ts);
   CREATE INDEX IF NOT EXISTS idx_events_r_name ON events(router_id, name, ts);
+  CREATE INDEX IF NOT EXISTS idx_pop_events_r_ts ON pop_events(router_id, ts);
 `);
 if (legacy) {
   db.exec(`INSERT INTO samples SELECT 1, ts, online, offline, cpu, mem, rx, tx FROM samples_old;
@@ -100,9 +110,41 @@ function updateRouter(id, r) {
 }
 function deleteRouter(id) {
   tx(() => {
-    for (const t of ['samples', 'if_samples', 'events']) db.prepare(`DELETE FROM ${t} WHERE router_id = ?`).run(id);
+    for (const t of ['samples', 'if_samples', 'events', 'pops', 'pop_events']) db.prepare(`DELETE FROM ${t} WHERE router_id = ?`).run(id);
     db.prepare('DELETE FROM routers WHERE id = ?').run(id);
   });
+}
+
+// ---- POPs CRUD & events ----
+const listPops = (rid) => rid ? db.prepare('SELECT * FROM pops WHERE router_id = ? ORDER BY id').all(rid) : db.prepare('SELECT * FROM pops ORDER BY id').all();
+const getPop = (id) => db.prepare('SELECT * FROM pops WHERE id = ?').get(id);
+function addPop(p) {
+  const info = db.prepare('INSERT INTO pops (router_id, name, ip, location, notes, enabled) VALUES (?,?,?,?,?,?)')
+    .run(p.router_id || 1, p.name, p.ip, p.location || '', p.notes || '', p.enabled === false ? 0 : 1);
+  return getPop(Number(info.lastInsertRowid));
+}
+function updatePop(id, p) {
+  const cur = getPop(id); if (!cur) return null;
+  const m = { ...cur, ...p };
+  db.prepare('UPDATE pops SET router_id=?, name=?, ip=?, location=?, notes=?, enabled=? WHERE id=?')
+    .run(m.router_id, m.name, m.ip, m.location || '', m.notes || '', m.enabled ? 1 : 0, id);
+  return getPop(id);
+}
+function deletePop(id) {
+  tx(() => {
+    db.prepare('DELETE FROM pop_events WHERE pop_id = ?').run(id);
+    db.prepare('DELETE FROM pops WHERE id = ?').run(id);
+  });
+}
+function addPopEvent(e) {
+  try {
+    db.prepare('INSERT INTO pop_events (pop_id, router_id, ts, name, ip, event, detail) VALUES (?,?,?,?,?,?,?)')
+      .run(e.pop_id, e.router_id, e.ts, e.name, e.ip, e.event, e.detail || '');
+  } catch (err) { console.error('[db] pop_events', err.message); }
+}
+function listPopEvents(rid, limit = 100) {
+  return db.prepare('SELECT * FROM pop_events WHERE router_id = ? ORDER BY ts DESC, id DESC LIMIT ?')
+    .all(rid, limit).map((r) => ({ ...r, ts: r.ts * 1000 }));
 }
 
 // ---- aggregation: average all polls inside one SAMPLE_SEC window, then write one row ----
@@ -182,7 +224,7 @@ function userEvents({ rid, name, from, to }) {
 function prune() {
   const cutoff = Math.floor(Date.now() / 1000) - RETENTION_DAYS * 86400;
   try {
-    for (const t of ['samples', 'if_samples', 'events']) db.prepare(`DELETE FROM ${t} WHERE ts < ?`).run(cutoff);
+    for (const t of ['samples', 'if_samples', 'events', 'pop_events']) db.prepare(`DELETE FROM ${t} WHERE ts < ?`).run(cutoff);
   } catch (e) { console.error('[db] prune', e.message); }
 }
 prune(); setInterval(prune, 6 * 3600 * 1000).unref();
@@ -190,4 +232,8 @@ setInterval(() => flushAll(false), SAMPLE_SEC * 1000 + 2000).unref();
 process.on('SIGTERM', () => { flushAll(true); process.exit(0); });
 process.on('SIGINT', () => { flushAll(true); process.exit(0); });
 
-module.exports = { getSettings, setSettings, listRouters, getRouter, addRouter, updateRouter, deleteRouter, record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS };
+module.exports = {
+  getSettings, setSettings, listRouters, getRouter, addRouter, updateRouter, deleteRouter,
+  listPops, getPop, addPop, updatePop, deletePop, addPopEvent, listPopEvents,
+  record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS,
+};

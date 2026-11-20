@@ -41,6 +41,24 @@
 
 <main class="w-full max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 min-w-0">
   <div id="errorBox" class="hidden rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 px-4 py-3 text-sm"></div>
+  <div id="popAlarmBanner" class="hidden rounded-xl border-2 border-rose-500 bg-rose-950/80 text-rose-100 p-3 sm:p-4 shadow-lg shadow-rose-950/50">
+    <div class="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+      <div class="flex items-start gap-3 min-w-0">
+        <span class="h-3.5 w-3.5 rounded-full bg-rose-500 animate-ping mt-1.5 shrink-0"></span>
+        <div class="min-w-0">
+          <div class="font-bold text-sm sm:text-base text-rose-200 flex items-center gap-2 flex-wrap">
+            <span>🚨 ALARM POP DOWN!</span>
+            <span id="popAlarmCount" class="px-2 py-0.5 rounded bg-rose-500/30 text-xs font-semibold"></span>
+          </div>
+          <div id="popAlarmList" class="text-xs sm:text-sm text-rose-200/90 mt-1 flex flex-wrap gap-1.5"></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+        <button id="popAlarmMuteBtn" type="button" class="px-3 py-1.5 rounded-lg bg-rose-800/80 hover:bg-rose-700 border border-rose-500/50 text-xs font-medium whitespace-nowrap">🔕 Bisukan Bunyi</button>
+        <button id="popAlarmGoBtn" type="button" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold whitespace-nowrap">Lihat POP ›</button>
+      </div>
+    </div>
+  </div>
 
   <!-- KPI cards -->
   <section id="kpiSection" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
@@ -172,6 +190,123 @@
       <button id="evNext" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Next ›</button>
     </div>
   </section>
+  </div>
+  <div data-tab="pop" class="space-y-4 sm:space-y-6 hidden min-w-0">
+    <!-- POP summary cards -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-500">Total POP</p>
+        <p id="popKTotal" class="text-2xl sm:text-3xl font-bold">-</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-500">POP Online (UP)</p>
+        <p id="popKUp" class="text-2xl sm:text-3xl font-bold text-emerald-400">-</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-500">POP Down</p>
+        <p id="popKDown" class="text-2xl sm:text-3xl font-bold text-rose-400">-</p>
+      </div>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+        <p class="text-xs text-slate-500">Rata-rata Ping</p>
+        <p id="popKRtt" class="text-2xl sm:text-3xl font-bold text-sky-400">-</p>
+      </div>
+    </section>
+
+    <!-- POP form & table -->
+    <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <div class="p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h2 class="text-sm font-medium">Monitoring POP (Ping IP via Router)</h2>
+            <p class="text-xs text-slate-500">Pantau status IP POP / OLT / Radio secara otomatis. Alarm berbunyi jika ada POP yang DOWN.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="popSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium">🔊 Alarm Bunyi: ON</button>
+            <button id="popTestSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">🔔 Tes Bunyi</button>
+            <button id="popCheckBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">↻ Cek Sekarang</button>
+            <button id="popToggleFormBtn" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium">+ Tambah POP</button>
+          </div>
+        </div>
+
+        <form id="popForm" class="hidden rounded-xl bg-slate-950/70 border border-slate-800 p-3 sm:p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 id="popFormTitle" class="text-xs font-semibold uppercase tracking-wider text-sky-400">Tambah POP Baru</h3>
+            <button type="button" id="popFormClose" class="text-xs text-slate-400 hover:text-slate-200">✕ Tutup</button>
+          </div>
+          <input type="hidden" id="popId">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <label class="space-y-1">
+              <span class="text-xs text-slate-400">Nama POP *</span>
+              <input id="popName" required placeholder="mis. POP Sukamaju / OLT-01" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+            </label>
+            <label class="space-y-1">
+              <span class="text-xs text-slate-400">IP Address / Host *</span>
+              <input id="popIp" required placeholder="mis. 10.10.1.2" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 font-mono focus:outline-none focus:border-sky-500">
+            </label>
+            <label class="space-y-1">
+              <span class="text-xs text-slate-400">Lokasi / Area</span>
+              <input id="popLoc" placeholder="mis. Desa Sukamaju" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+            </label>
+            <label class="space-y-1">
+              <span class="text-xs text-slate-400">Keterangan</span>
+              <input id="popNotes" placeholder="mis. SFP2 / OLT ZTE" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+            </label>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="submit" id="popSaveBtn" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium">Simpan &amp; Ping</button>
+            <button type="button" id="popCancelBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs">Batal</button>
+            <span id="popFormMsg" class="text-xs text-slate-400"></span>
+          </div>
+        </form>
+
+        <div class="flex gap-2 flex-wrap items-center">
+          <select id="popFilterStatus" class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+            <option value="all">Semua Status</option>
+            <option value="down">DOWN Saja</option>
+            <option value="up">UP Saja</option>
+          </select>
+          <input id="popSearch" placeholder="Cari nama POP / IP / lokasi…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm flex-1 min-w-[12rem] focus:outline-none focus:border-sky-500">
+        </div>
+      </div>
+
+      <div id="popScroll" tabindex="0" role="region" aria-label="Tabel daftar POP" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-y border-slate-800/60">
+        <table class="w-full text-sm">
+          <thead id="popHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
+            <tr>
+              <th class="text-left px-4 py-2">Status</th>
+              <th class="text-left px-4 py-2">Nama POP</th>
+              <th class="text-left px-4 py-2">IP Address</th>
+              <th class="text-right px-4 py-2">Ping / Loss</th>
+              <th class="text-left px-4 py-2 hidden sm:table-cell">Lokasi</th>
+              <th class="text-left px-4 py-2 hidden md:table-cell">Keterangan / Durasi</th>
+              <th class="text-right px-4 py-2">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="popBody" class="divide-y divide-slate-800"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- POP down/up log history -->
+    <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <div class="p-4 flex items-center justify-between gap-2 flex-wrap">
+        <h2 class="text-sm font-medium">Riwayat Putus / Nyambung POP <span id="popEvCount" class="text-slate-500 font-normal"></span></h2>
+      </div>
+      <div id="popEvScroll" tabindex="0" role="region" aria-label="Tabel riwayat kejadian POP" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-t border-slate-800/60">
+        <table class="w-full text-sm">
+          <thead id="popEvHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
+            <tr>
+              <th class="text-left px-4 py-2">Waktu</th>
+              <th class="text-left px-4 py-2">Status</th>
+              <th class="text-left px-4 py-2">Nama POP</th>
+              <th class="text-left px-4 py-2">IP Address</th>
+              <th class="text-left px-4 py-2 hidden sm:table-cell">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="popEvBody" class="divide-y divide-slate-800"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
   <div data-tab="pengaturan" class="space-y-4 sm:space-y-6 hidden min-w-0">
   <!-- company & logo settings -->
@@ -426,6 +561,7 @@ async function loadSummary() {
   ifaces = s.ifaces; renderIfaces();
   const sel = $('ifSelect'), names = s.ifaces.map((i) => i.name);
   if (sel.options.length !== names.length) { const cur = sel.value; sel.innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join(''); const want = cur || ST.iface; if (names.includes(want)) sel.value = want; }
+  if (Array.isArray(s.pops)) updatePopState(s.pops);
 }
 
 let page = ST.page || 1, timer;
@@ -504,14 +640,18 @@ $('evSpan').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; loadEven
 $('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); }, 300); };
 
 const MAIN_TABS = [['network', 'Network'], ['pengaturan', 'Pengaturan']];
-const NET_TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat']];
+const NET_TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat'], ['pop', 'Monitor POP']];
 let mainTab = ST.mainTab === 'pengaturan' || ST.tab === 'pengaturan' ? 'pengaturan' : 'network';
 let netTab = NET_TABS.some(([k]) => k === (ST.netTab || ST.tab)) ? (ST.netTab || ST.tab) : 'grafik';
 let tab = mainTab === 'pengaturan' ? 'pengaturan' : netTab;
+let pops = [], popEvents = [], popDownCount = 0;
 function showTab() {
   tab = mainTab === 'pengaturan' ? 'pengaturan' : netTab;
   $('tabs').innerHTML = MAIN_TABS.map(([k, l]) => `<button data-m="${k}" class="px-4 py-2 whitespace-nowrap border-b-2 font-medium ${mainTab === k ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'}">${esc(l)}</button>`).join('');
-  $('netTabs').innerHTML = NET_TABS.map(([k, l]) => `<button data-n="${k}" class="px-3.5 py-1.5 rounded-lg whitespace-nowrap font-medium transition ${netTab === k ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'}">${esc(l)}</button>`).join('');
+  $('netTabs').innerHTML = NET_TABS.map(([k, l]) => {
+    const badge = k === 'pop' && popDownCount > 0 ? ` <span class="ml-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">${popDownCount} DOWN</span>` : '';
+    return `<button data-n="${k}" class="px-3.5 py-1.5 rounded-lg whitespace-nowrap font-medium transition ${netTab === k ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'}">${esc(l)}${badge}</button>`;
+  }).join('');
   const isNet = mainTab === 'network';
   $('kpiSection').classList.toggle('hidden', !isNet);
   $('netTabs').classList.toggle('hidden', !isNet);
@@ -519,9 +659,270 @@ function showTab() {
   $('netTabs').classList.toggle('sm:flex', isNet);
   document.querySelectorAll('[data-tab]').forEach((el) => el.classList.toggle('hidden', el.dataset.tab !== tab));
   if (tab === 'grafik') [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.resize());
+  if (tab === 'pop') renderPops();
 }
-$('tabs').onclick = (e) => { const k = e.target.dataset.m; if (!k) return; mainTab = k; save({ mainTab, tab: mainTab === 'pengaturan' ? 'pengaturan' : netTab }); showTab(); window.scrollTo(0, 0); n = 0; tick(); };
-$('netTabs').onclick = (e) => { const k = e.target.dataset.n; if (!k) return; netTab = k; save({ netTab, tab: netTab }); showTab(); n = 0; tick(); };
+$('tabs').onclick = (e) => { const b = e.target.closest('[data-m]'); if (!b) return; mainTab = b.dataset.m; save({ mainTab, tab: mainTab === 'pengaturan' ? 'pengaturan' : netTab }); showTab(); window.scrollTo(0, 0); n = 0; tick(); };
+$('netTabs').onclick = (e) => { const b = e.target.closest('[data-n]'); if (!b) return; netTab = b.dataset.n; save({ netTab, tab: netTab }); showTab(); n = 0; tick(); };
+
+// ---- POP Monitoring & Audible Alarm ----
+let popSoundOn = ST.popSoundOn !== false;
+let popMutedSig = '';
+let audioCtx = null, alarmTimer = null;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+document.addEventListener('click', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {}); }, { passive: true });
+
+function playAlarmBeep() {
+  try {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Urgent 3-pulse dual-tone NOC alarm siren (880Hz / 660Hz / 987Hz)
+    [[880, 0, 0.18], [660, 0.22, 0.18], [987.77, 0.44, 0.24]].forEach(([freq, offset, dur]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + offset);
+      gain.gain.setValueAtTime(0.001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.22, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + dur + 0.02);
+    });
+  } catch (e) { console.error('Audio alarm error:', e); }
+}
+
+function updateSoundBtn() {
+  $('popSoundBtn').textContent = popSoundOn ? '🔊 Alarm Bunyi: ON' : '🔇 Alarm Bunyi: OFF';
+  $('popSoundBtn').className = 'px-3 py-1.5 rounded-lg text-xs font-medium border ' + (popSoundOn
+    ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
+    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700');
+}
+updateSoundBtn();
+
+function syncAlarmLoop() {
+  const downList = pops.filter((p) => p.enabled && p.status === 'down');
+  const sig = downList.map((p) => p.id).sort((a, b) => a - b).join(',');
+  if (!downList.length) {
+    popMutedSig = '';
+    if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
+    $('popAlarmBanner').classList.add('hidden');
+    return;
+  }
+  $('popAlarmBanner').classList.remove('hidden');
+  $('popAlarmCount').textContent = `${downList.length} POP tidak merespons ping`;
+  $('popAlarmList').innerHTML = downList.map((p) => {
+    const dur = p.downSince ? ' · down ' + fmtDur(Date.now() - p.downSince) : '';
+    return `<span class="px-2.5 py-1 rounded-lg bg-rose-900/80 border border-rose-500/40 font-medium">${esc(p.name)} <code class="text-rose-300">(${esc(p.ip)})</code>${esc(dur)}</span>`;
+  }).join('');
+  const isMuted = popMutedSig === sig;
+  $('popAlarmMuteBtn').textContent = isMuted ? '🔊 Bunyikan Lagi' : '🔕 Bisukan Bunyi';
+  const shouldRing = popSoundOn && !isMuted;
+  if (shouldRing && !alarmTimer) {
+    playAlarmBeep();
+    alarmTimer = setInterval(playAlarmBeep, 2600);
+  } else if (!shouldRing && alarmTimer) {
+    clearInterval(alarmTimer);
+    alarmTimer = null;
+  }
+}
+
+$('popAlarmMuteBtn').onclick = () => {
+  const downList = pops.filter((p) => p.enabled && p.status === 'down');
+  const sig = downList.map((p) => p.id).sort((a, b) => a - b).join(',');
+  popMutedSig = popMutedSig === sig ? '' : sig;
+  syncAlarmLoop();
+};
+$('popAlarmGoBtn').onclick = () => {
+  mainTab = 'network'; netTab = 'pop'; save({ mainTab, netTab, tab: 'pop' }); showTab(); loadPops();
+};
+$('popSoundBtn').onclick = () => {
+  ensureAudio();
+  popSoundOn = !popSoundOn;
+  save({ popSoundOn });
+  updateSoundBtn();
+  syncAlarmLoop();
+};
+$('popTestSoundBtn').onclick = () => {
+  ensureAudio();
+  playAlarmBeep();
+};
+
+function updatePopState(list) {
+  pops = list;
+  const prevDown = popDownCount;
+  popDownCount = pops.filter((p) => p.enabled && p.status === 'down').length;
+  if (prevDown !== popDownCount) showTab();
+  syncAlarmLoop();
+  renderPops();
+}
+
+function fitScroll5(bodyId, headId, scrollId) {
+  const trs = [...$(bodyId).querySelectorAll('tr')];
+  if (trs.length > 5 && $(headId).offsetHeight) {
+    const h = $(headId).offsetHeight + trs.slice(0, 5).reduce((s, r) => s + r.offsetHeight, 0) + 2;
+    $(scrollId).style.maxHeight = h + 'px';
+  } else {
+    $(scrollId).style.maxHeight = '';
+  }
+}
+
+function renderPops() {
+  const en = pops.filter((p) => p.enabled);
+  const upList = en.filter((p) => p.status === 'up');
+  const downList = en.filter((p) => p.status === 'down');
+  const rtts = upList.map((p) => p.rttMs).filter((v) => v != null);
+  const avgRtt = rtts.length ? (rtts.reduce((a, b) => a + b, 0) / rtts.length).toFixed(1) + ' ms' : '-';
+  $('popKTotal').textContent = fmtN(pops.length);
+  $('popKUp').textContent = fmtN(upList.length);
+  $('popKDown').textContent = fmtN(downList.length);
+  $('popKRtt').textContent = avgRtt;
+
+  const stF = $('popFilterStatus').value;
+  const q = ($('popSearch').value || '').toLowerCase();
+  const filtered = pops.filter((p) => {
+    if (stF === 'down' && !(p.enabled && p.status === 'down')) return false;
+    if (stF === 'up' && !(p.enabled && p.status === 'up')) return false;
+    if (q && !`${p.name} ${p.ip} ${p.location || ''} ${p.notes || ''}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  $('popBody').innerHTML = filtered.length ? filtered.map((p) => {
+    let badge = '<span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400">mengecek…</span>';
+    if (!p.enabled) badge = '<span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-500">nonaktif</span>';
+    else if (p.status === 'up') badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300"><span class="h-2 w-2 rounded-full bg-emerald-400"></span>UP</span>';
+    else if (p.status === 'down') badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold bg-rose-500/30 text-rose-200 animate-pulse"><span class="h-2 w-2 rounded-full bg-rose-500"></span>DOWN</span>';
+
+    const rttText = !p.enabled ? '-' : p.status === 'up' ? `${p.rttMs != null ? p.rttMs + ' ms' : 'OK'}${p.lossPct ? ` (${p.lossPct}% loss)` : ''}` : p.status === 'down' ? 'Timeout (100% loss)' : '…';
+    const durText = p.status === 'down' && p.downSince ? `<span class="text-rose-400 font-medium">Down ${fmtDur(Date.now() - p.downSince)}</span>` : p.lastChange ? `Sejak ${fmtDT(p.lastChange)}` : '';
+    const infoText = [p.notes, durText].filter(Boolean).join(' · ');
+
+    return `<tr class="hover:bg-slate-800/40 ${p.enabled && p.status === 'down' ? 'bg-rose-950/30' : ''}">
+      <td class="px-4 py-2 whitespace-nowrap">${badge}</td>
+      <td class="px-4 py-2 font-medium break-all">${esc(p.name)}<div class="sm:hidden text-xs text-slate-500">${esc(p.location || '-')}</div></td>
+      <td class="px-4 py-2 font-mono text-xs sm:text-sm text-sky-300 whitespace-nowrap">${esc(p.ip)}</td>
+      <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap ${p.status === 'down' ? 'text-rose-400 font-semibold' : 'text-slate-300'}">${rttText}</td>
+      <td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(p.location || '-')}</td>
+      <td class="px-4 py-2 text-slate-400 text-xs hidden md:table-cell">${infoText || '-'}</td>
+      <td class="px-4 py-2 text-right whitespace-nowrap">
+        <div class="inline-flex gap-1 text-xs">
+          <button data-pop-act="edit" data-id="${p.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
+          <button data-pop-act="toggle" data-id="${p.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">${p.enabled ? 'Off' : 'On'}</button>
+          <button data-pop-act="del" data-id="${p.id}" class="px-2.5 py-1 rounded bg-rose-600/70 hover:bg-rose-600 text-white">Hapus</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">${pops.length ? 'Tidak ada POP yang sesuai filter' : 'Belum ada data POP. Klik "+ Tambah POP" untuk mulai memantau IP POP.'}</td></tr>`;
+
+  fitScroll5('popBody', 'popHead', 'popScroll');
+}
+
+function renderPopEvents() {
+  $('popEvCount').textContent = `(${fmtN(popEvents.length)})`;
+  $('popEvBody').innerHTML = popEvents.length ? popEvents.map((e) => `<tr class="hover:bg-slate-800/40">
+    <td class="px-4 py-2 whitespace-nowrap text-slate-400 tabular-nums">${fmtDT(e.ts)}</td>
+    <td class="px-4 py-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-xs font-semibold ${e.event === 'up' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-200'}">${e.event === 'up' ? 'UP (Nyambung)' : 'DOWN (Putus)'}</span></td>
+    <td class="px-4 py-2 font-medium break-all">${esc(e.name)}</td>
+    <td class="px-4 py-2 font-mono text-xs text-sky-300 whitespace-nowrap">${esc(e.ip)}</td>
+    <td class="px-4 py-2 text-xs text-slate-400 hidden sm:table-cell">${esc(e.detail || '-')}</td>
+  </tr>`).join('') : `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Belum ada riwayat putus / nyambung POP</td></tr>`;
+  fitScroll5('popEvBody', 'popEvHead', 'popEvScroll');
+}
+
+async function loadPops() {
+  const d = await (await rq('/api/pops')).json();
+  if (Array.isArray(d.pops)) updatePopState(d.pops);
+  if (Array.isArray(d.events)) { popEvents = d.events; renderPopEvents(); }
+}
+
+function resetPopForm(hide = true) {
+  $('popForm').reset();
+  $('popId').value = '';
+  $('popFormTitle').textContent = 'Tambah POP Baru';
+  $('popFormMsg').textContent = '';
+  if (hide) $('popForm').classList.add('hidden');
+}
+$('popToggleFormBtn').onclick = () => {
+  const hidden = $('popForm').classList.contains('hidden');
+  resetPopForm(!hidden);
+  if (hidden) { $('popForm').classList.remove('hidden'); $('popName').focus(); }
+};
+$('popFormClose').onclick = () => resetPopForm(true);
+$('popCancelBtn').onclick = () => resetPopForm(true);
+$('popFilterStatus').onchange = () => { $('popScroll').scrollTop = 0; renderPops(); };
+$('popSearch').oninput = () => { $('popScroll').scrollTop = 0; renderPops(); };
+
+$('popCheckBtn').onclick = async () => {
+  $('popCheckBtn').disabled = true;
+  $('popCheckBtn').textContent = '↻ Mengecek…';
+  try {
+    const d = await (await rq('/api/pops/check', { method: 'POST' })).json();
+    if (d.pops) updatePopState(d.pops);
+    if (d.events) { popEvents = d.events; renderPopEvents(); }
+  } catch (e) { console.error(e); }
+  $('popCheckBtn').disabled = false;
+  $('popCheckBtn').textContent = '↻ Cek Sekarang';
+};
+
+$('popForm').onsubmit = async (e) => {
+  e.preventDefault();
+  ensureAudio();
+  const id = $('popId').value;
+  $('popSaveBtn').disabled = true;
+  $('popFormMsg').textContent = 'Menyimpan & mengecek ping IP…';
+  try {
+    const body = {
+      name: $('popName').value.trim(),
+      ip: $('popIp').value.trim(),
+      location: $('popLoc').value.trim(),
+      notes: $('popNotes').value.trim(),
+    };
+    const r = await rq(id ? '/api/pops/' + id : '/api/pops', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) { $('popFormMsg').textContent = d.error; $('popSaveBtn').disabled = false; return; }
+    if (d.pops) updatePopState(d.pops);
+    if (d.events) { popEvents = d.events; renderPopEvents(); }
+    resetPopForm(true);
+  } catch (err) {
+    $('popFormMsg').textContent = 'Gagal: ' + err.message;
+  }
+  $('popSaveBtn').disabled = false;
+};
+
+$('popBody').onclick = async (e) => {
+  const b = e.target.closest('button[data-pop-act]');
+  if (!b) return;
+  const id = +b.dataset.id, p = pops.find((x) => x.id === id);
+  if (!p) return;
+  if (b.dataset.popAct === 'edit') {
+    $('popId').value = p.id;
+    $('popName').value = p.name;
+    $('popIp').value = p.ip;
+    $('popLoc').value = p.location || '';
+    $('popNotes').value = p.notes || '';
+    $('popFormTitle').textContent = 'Edit POP: ' + p.name;
+    $('popFormMsg').textContent = '';
+    $('popForm').classList.remove('hidden');
+    $('popName').focus();
+  } else if (b.dataset.popAct === 'toggle') {
+    const d = await (await rq('/api/pops/' + id, { method: 'PUT', body: JSON.stringify({ enabled: !p.enabled }) })).json();
+    if (d.pops) updatePopState(d.pops);
+  } else if (b.dataset.popAct === 'del' && confirm(`Hapus POP "${p.name}" (${p.ip})?`)) {
+    const d = await (await rq('/api/pops/' + id, { method: 'DELETE' })).json();
+    if (d.pops) updatePopState(d.pops);
+    if (d.events) { popEvents = d.events; renderPopEvents(); }
+  }
+};
+
 showTab();
 
 // ---- company & logo settings ----
@@ -669,10 +1070,10 @@ async function loadRouters() {
 }
 function resetForRouter() {
   $('ifSelect').innerHTML = ''; save({ iface: '' }); delete ST.iface;
-  page = 1; evPage = 1; hist = null; ifaces = [];
+  page = 1; evPage = 1; hist = null; ifaces = []; pops = []; popEvents = []; popMutedSig = '';
   [cTraffic, cOnline, cCpu, cIf].forEach((c) => { c.data.labels = []; c.data.datasets.forEach((d) => (d.data = [])); c.update(); });
-  $('pBody').innerHTML = ''; $('evBody').innerHTML = ''; $('ifBody').innerHTML = '';
-  closeModal(); n = 0; tick();
+  $('pBody').innerHTML = ''; $('evBody').innerHTML = ''; $('ifBody').innerHTML = ''; $('popBody').innerHTML = ''; $('popEvBody').innerHTML = '';
+  syncAlarmLoop(); closeModal(); n = 0; tick();
 }
 $('routerSel').onchange = () => { rid = +$('routerSel').value; save({ router: rid }); resetForRouter(); };
 
@@ -789,6 +1190,7 @@ async function tick() {
     if (tab === 'pppoe') jobs.push(loadPppoe());
     if (tab === 'grafik' && (range === 'live' || n % 12 === 0)) jobs.push(loadHistory());
     if (tab === 'riwayat' && n % 6 === 0) jobs.push(loadEvents());
+    if (tab === 'pop' && n % 2 === 0) jobs.push(loadPops());
     await Promise.all(jobs); n++;
     $('live').className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
   } catch (e) { console.error(e); $('live').className = 'h-2 w-2 rounded-full bg-rose-500'; }
