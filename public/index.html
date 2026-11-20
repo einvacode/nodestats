@@ -160,9 +160,9 @@
         <input id="evSearch" placeholder="Cari username…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm flex-1 min-w-[10rem] focus:outline-none focus:border-sky-500">
       </div>
     </div>
-    <div class="overflow-x-auto">
+    <div id="evScroll" tabindex="0" role="region" aria-label="Tabel riwayat putus konek PPPoE" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-y border-slate-800/60">
       <table class="w-full text-sm">
-        <thead id="evHead" class="text-xs text-slate-500 bg-slate-950/50"></thead>
+        <thead id="evHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10"></thead>
         <tbody id="evBody" class="divide-y divide-slate-800"></tbody>
       </table>
     </div>
@@ -481,13 +481,20 @@ async function loadEvents() {
     }).join('') : empty;
   const pages = Math.max(1, Math.ceil(d.total / 50));
   $('evPage').textContent = `Halaman ${evPage} / ${pages}`; $('evPrev').disabled = evPage <= 1; $('evNext').disabled = evPage >= pages;
+  const trs = [...$('evBody').querySelectorAll('tr')];
+  if (trs.length > 5 && $('evHead').offsetHeight) {
+    const h = $('evHead').offsetHeight + trs.slice(0, 5).reduce((s, r) => s + r.offsetHeight, 0) + 2;
+    $('evScroll').style.maxHeight = h + 'px';
+  } else {
+    $('evScroll').style.maxHeight = '';
+  }
 }
 drawEvHead();
-$('evPrev').onclick = () => { evPage--; loadEvents(); };
-$('evNext').onclick = () => { evPage++; loadEvents(); };
-$('evDate').onchange = () => { evPage = 1; loadEvents(); };
-$('evSpan').onchange = () => { evPage = 1; loadEvents(); };
-$('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; loadEvents(); }, 300); };
+$('evPrev').onclick = () => { evPage--; $('evScroll').scrollTop = 0; loadEvents(); };
+$('evNext').onclick = () => { evPage++; $('evScroll').scrollTop = 0; loadEvents(); };
+$('evDate').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); };
+$('evSpan').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); };
+$('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); }, 300); };
 
 const MAIN_TABS = [['network', 'Network'], ['pengaturan', 'Pengaturan']];
 const NET_TABS = [['grafik', 'Grafik'], ['iface', 'Interface & VLAN'], ['pppoe', 'Pelanggan PPPoE'], ['riwayat', 'Riwayat']];
