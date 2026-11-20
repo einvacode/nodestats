@@ -61,19 +61,26 @@
   </div>
 
   <!-- KPI cards -->
-  <section id="kpiSection" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl sm:text-3xl font-bold text-emerald-400">-</p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl sm:text-3xl font-bold text-rose-400">-</p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-xs text-slate-500">Total Aktif (secret)</p><p id="kEnabled" class="text-2xl sm:text-3xl font-bold">-</p><p id="kDisabled" class="text-xs text-slate-500"></p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-      <p class="text-xs text-slate-500">Rasio Online</p><p id="kPct" class="text-2xl sm:text-3xl font-bold text-sky-400">-</p>
+  <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-3.5">
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl font-bold text-emerald-400">-</p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl font-bold text-rose-400">-</p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">Total Aktif (secret)</p><p id="kEnabled" class="text-2xl font-bold">-</p><p id="kDisabled" class="text-xs text-slate-500"></p></div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
+      <p class="text-xs text-slate-500">Rasio PPPoE</p><p id="kPct" class="text-2xl font-bold text-sky-400">-</p>
       <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
     </div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-      <p class="text-xs text-slate-500">CPU</p><p id="kCpu" class="text-2xl sm:text-3xl font-bold">-</p><p id="kCpuSub" class="text-xs text-slate-500"></p>
+    <div id="kPopCard" class="rounded-xl bg-slate-900 border border-slate-800 p-3.5 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-xs text-slate-500">Jumlah POP</p><p id="kPopTotal" class="text-2xl font-bold">-</p><p id="kPopSub" class="text-xs text-slate-500">0 aktif</p>
     </div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-      <p class="text-xs text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl sm:text-3xl font-bold">-</p><p id="kTemp" class="text-xs text-slate-500"></p>
+    <div id="kPopPctCard" class="rounded-xl bg-slate-900 border border-slate-800 p-3.5 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-xs text-slate-500">Rasio POP Online</p><p id="kPopPct" class="text-2xl font-bold text-emerald-400">-</p>
+      <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPopPctBar" class="h-1.5 rounded bg-emerald-500 transition-all" style="width:0"></div></div>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
+      <p class="text-xs text-slate-500">CPU</p><p id="kCpu" class="text-2xl font-bold">-</p><p id="kCpuSub" class="text-xs text-slate-500"></p>
+    </div>
+    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
+      <p class="text-xs text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl font-bold">-</p><p id="kTemp" class="text-xs text-slate-500"></p>
     </div>
   </section>
 
@@ -552,7 +559,7 @@ async function loadSummary() {
   $('kOnline').textContent = fmtN(p.online); $('kOffline').textContent = fmtN(p.offline);
   $('kEnabled').textContent = fmtN(p.enabled); $('kDisabled').textContent = fmtN(p.disabled) + ' secret disabled';
   $('kPct').textContent = p.pct + '%'; $('kPctBar').style.width = p.pct + '%';
-  $('kCpu').textContent = s.router.cpu + '%'; $('kCpu').className = 'text-2xl sm:text-3xl font-bold ' + (s.router.cpu > 80 ? 'text-rose-400' : s.router.cpu > 50 ? 'text-amber-400' : '');
+  $('kCpu').textContent = s.router.cpu + '%'; $('kCpu').className = 'text-2xl font-bold ' + (s.router.cpu > 80 ? 'text-rose-400' : s.router.cpu > 50 ? 'text-amber-400' : '');
   $('kCpuSub').textContent = s.router.cpuCount + ' core';
   $('kMem').textContent = s.router.memUsedPct + '%';
   $('kTemp').textContent = (s.router.temp != null ? s.router.temp + '°C · ' : '') + (s.router.memTotal / 1073741824).toFixed(0) + ' GB RAM';
@@ -742,9 +749,12 @@ $('popAlarmMuteBtn').onclick = () => {
   popMutedSig = popMutedSig === sig ? '' : sig;
   syncAlarmLoop();
 };
-$('popAlarmGoBtn').onclick = () => {
+const openPopTab = () => {
   mainTab = 'network'; netTab = 'pop'; save({ mainTab, netTab, tab: 'pop' }); showTab(); loadPops();
 };
+$('popAlarmGoBtn').onclick = openPopTab;
+$('kPopCard').onclick = openPopTab;
+$('kPopPctCard').onclick = openPopTab;
 $('popSoundBtn').onclick = () => {
   ensureAudio();
   popSoundOn = !popSoundOn;
@@ -786,6 +796,27 @@ function renderPops() {
   $('popKUp').textContent = fmtN(upList.length);
   $('popKDown').textContent = fmtN(downList.length);
   $('popKRtt').textContent = avgRtt;
+
+  // Update main KPI cards for POP
+  $('kPopTotal').textContent = fmtN(en.length);
+  if (!en.length) {
+    $('kPopSub').textContent = pops.length ? `${pops.length} nonaktif` : 'belum ada POP';
+    $('kPopSub').className = 'text-xs text-slate-500';
+    $('kPopPct').textContent = '-';
+    $('kPopPct').className = 'text-2xl font-bold text-slate-400';
+    $('kPopPctBar').style.width = '0%';
+    $('kPopPctBar').className = 'h-1.5 rounded bg-slate-700 transition-all';
+    $('kPopCard').className = 'rounded-xl bg-slate-900 border border-slate-800 p-3.5 cursor-pointer hover:border-slate-700 transition';
+  } else {
+    const pct = +((upList.length / en.length) * 100).toFixed(1);
+    $('kPopSub').textContent = downList.length ? `${upList.length} UP · ${downList.length} DOWN` : `${upList.length} UP · 0 DOWN`;
+    $('kPopSub').className = 'text-xs ' + (downList.length ? 'text-rose-400 font-semibold' : 'text-emerald-400');
+    $('kPopPct').textContent = pct + '%';
+    $('kPopPct').className = 'text-2xl font-bold ' + (downList.length ? 'text-rose-400' : 'text-emerald-400');
+    $('kPopPctBar').style.width = pct + '%';
+    $('kPopPctBar').className = 'h-1.5 rounded transition-all ' + (downList.length ? 'bg-rose-500' : 'bg-emerald-500');
+    $('kPopCard').className = 'rounded-xl bg-slate-900 p-3.5 cursor-pointer transition border ' + (downList.length ? 'border-rose-500/70 bg-rose-950/20' : 'border-slate-800 hover:border-slate-700');
+  }
 
   const stF = $('popFilterStatus').value;
   const q = ($('popSearch').value || '').toLowerCase();
