@@ -31,8 +31,9 @@ function rosGet(r, p) {
   return new Promise((resolve, reject) => {
     const lib = r.scheme === 'https' ? https : http;
     const req = lib.request({
-      host: r.host, port: r.port, path: '/rest' + p, method: 'GET', timeout: 20000,
-      auth: `${r.user}:${r.pass}`, rejectUnauthorized: !r.insecure, headers: { Accept: 'application/json' },
+      host: r.host, port: r.port, path: '/rest' + p, method: 'GET', agent: false, timeout: 30000,
+      auth: `${r.user}:${r.pass}`, rejectUnauthorized: !r.insecure,
+      headers: { Accept: 'application/json', Connection: 'close' },
     }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
@@ -101,11 +102,13 @@ class Collector {
       if (this.demo) ({ resource, health, identity, ifaces, active } = this.demo.tick());
       else {
         const g = (p) => rosGet(this.r, p);
-        [resource, health, identity, ifaces, active] = await Promise.all([
-          g('/system/resource'), g('/system/health').catch(() => []), g('/system/identity').catch(() => ({})),
-          g('/interface?.proplist=name,type,running,disabled,rx-byte,tx-byte,rx-error,tx-error,rx-drop,tx-drop,comment'),
-          g('/ppp/active?.proplist=name,address,uptime,caller-id,service'),
-        ]);
+        const ifProp = '.proplist=name,type,running,disabled,rx-byte,tx-byte,rx-error,tx-error,rx-drop,tx-drop,comment';
+        resource = await g('/system/resource');
+        health = await g('/system/health').catch(() => []);
+        identity = this.identity ? { name: this.identity } : await g('/system/identity').catch(() => ({}));
+        ifaces = await g('/interface?-dynamic=&' + ifProp);
+        if (!Array.isArray(ifaces) || !ifaces.length) ifaces = await g('/interface?' + ifProp);
+        active = await g('/ppp/active?.proplist=name,address,uptime,caller-id,service');
       }
       if (this.stopped) return;
       const now = Date.now(), list = []; let totRx = 0, totTx = 0;
@@ -145,7 +148,13 @@ class Collector {
   async pollSlow() {
     if (this.stopped) return;
     try {
-      this.secrets = this.demo ? this.demo.secrets : await rosGet(this.r, '/ppp/secret?.proplist=name,profile,disabled,service,comment');
+      if (this.demo) {
+        this.secrets = this.demo.secrets;
+      } else {
+        const id = await rosGet(this.r, '/system/identity').catch(() => null);
+        if (id && id.name) this.identity = id.name;
+        this.secrets = await rosGet(this.r, '/ppp/secret?.proplist=name,profile,disabled,service,comment');
+      }
       this.secretsUpdated = Date.now();
     } catch (e) { console.error(`[${this.r.name}] secrets`, e.message); }
     this.later(() => this.pollSlow(), CFG.slow);
