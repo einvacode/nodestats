@@ -3,8 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>NodeStats – MikroTik Monitor</title>
-<link id="favicon" rel="icon" href="data:,">
+<link id="favicon" rel="icon" href="/pwa-icon.svg">
+<link rel="apple-touch-icon" href="/pwa-icon.svg">
+<link rel="manifest" href="/manifest.json">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config = { darkMode: 'class' }</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
@@ -24,6 +29,7 @@
     </div>
     <div class="flex items-center gap-1 shrink-0">
       <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 sm:py-1.5 text-xs sm:text-sm max-w-[7.5rem] sm:max-w-xs truncate focus:outline-none focus:border-sky-500"></select>
+      <button id="pwaInstallBtn" title="Install Aplikasi (PWA)" class="hidden h-8 px-2.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 text-xs font-medium shrink-0">📲 Install</button>
       <button id="updBtn" title="Update aplikasi" class="relative h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm shrink-0">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
       <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm shrink-0">⚙</button>
       <span id="userBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs"></span>
@@ -783,8 +789,47 @@ $('netTabs').onclick = (e) => { const b = e.target.closest('[data-n]'); if (!b) 
 
 // ---- POP Monitoring & Audible Alarm ----
 let popSoundOn = ST.popSoundOn !== false;
-let popMutedSig = '';
+let popMutedSig = '', lastNotifiedSig = '';
 let audioCtx = null, alarmTimer = null;
+
+// ---- PWA Service Worker, Install Prompt & System Notifications ----
+let deferredInstallPrompt = null;
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  $('pwaInstallBtn').classList.remove('hidden');
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  $('pwaInstallBtn').classList.add('hidden');
+});
+$('pwaInstallBtn').onclick = async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice.catch(() => {});
+  deferredInstallPrompt = null;
+  $('pwaInstallBtn').classList.add('hidden');
+};
+function requestNotifPerm() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+function notifyPopDown(downList) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const title = `🚨 ALARM: ${downList.length} POP DOWN!`;
+  const body = downList.map((p) => `${p.name} (${p.ip})`).join(', ');
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, { body, icon: '/pwa-icon.svg', tag: 'pop-down-alarm', renotify: true })).catch(() => {});
+  } else {
+    try { new Notification(title, { body, icon: '/pwa-icon.svg' }); } catch {}
+  }
+}
 
 function ensureAudio() {
   if (!audioCtx) {
@@ -834,10 +879,15 @@ function syncAlarmLoop() {
   const baseTitle = (cfg.companyName || 'NodeStats') + (cfg.tagline ? ' – ' + cfg.tagline : ' – MikroTik Monitor');
   if (!downList.length) {
     popMutedSig = '';
+    lastNotifiedSig = '';
     if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
     $('popAlarmBanner').classList.add('hidden');
     document.title = baseTitle;
     return;
+  }
+  if (sig !== lastNotifiedSig) {
+    lastNotifiedSig = sig;
+    notifyPopDown(downList);
   }
   document.title = `🚨 (${downList.length} POP DOWN) ${baseTitle}`;
   $('popAlarmBanner').classList.remove('hidden');
@@ -872,6 +922,7 @@ $('kPopCard').onclick = openPopTab;
 $('kPopPctCard').onclick = openPopTab;
 $('popSoundBtn').onclick = () => {
   ensureAudio();
+  requestNotifPerm();
   popSoundOn = !popSoundOn;
   save({ popSoundOn });
   updateSoundBtn();
@@ -879,6 +930,7 @@ $('popSoundBtn').onclick = () => {
 };
 $('popTestSoundBtn').onclick = () => {
   ensureAudio();
+  requestNotifPerm();
   playAlarmBeep();
 };
 

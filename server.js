@@ -379,7 +379,7 @@ function getAuthUser(req) {
   return null;
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const send = (res, code, o, extraHeaders = {}) => {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extraHeaders });
   res.end(JSON.stringify(o));
@@ -554,6 +554,54 @@ http.createServer(async (req, res) => {
         return send(res, 200, { pops: c.popsList(), events: DB.listPopEvents(c.id, 100) });
       }
       return send(res, 404, { error: 'unknown endpoint' });
+    }
+
+    // PWA dynamic manifest & icon (uses company name & uploaded logo from DB settings)
+    if (u.pathname === '/manifest.json' && req.method === 'GET') {
+      const s = DB.getSettings();
+      const name = s.companyName || 'NodeStats';
+      const icons = [{ src: '/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }];
+      if (s.logo && /^data:image\/png;base64,/i.test(s.logo)) {
+        icons.unshift(
+          { src: '/pwa-icon.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/pwa-icon.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        );
+      }
+      return send(res, 200, {
+        name: name + (s.tagline ? ' – ' + s.tagline : ' – MikroTik & POP Monitor'),
+        short_name: name.slice(0, 20),
+        description: s.tagline || 'MikroTik & POP Monitoring Dashboard',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'any',
+        background_color: '#020617',
+        theme_color: '#0f172a',
+        icons,
+      }, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
+    }
+    if (u.pathname === '/pwa-icon.png' && req.method === 'GET') {
+      const s = DB.getSettings();
+      const mPng = String(s.logo || '').match(/^data:image\/png;base64,(.+)$/i);
+      if (mPng) {
+        const buf = Buffer.from(mPng[1], 'base64');
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' });
+        return res.end(buf);
+      }
+      res.writeHead(302, { Location: '/pwa-icon.svg' });
+      return res.end();
+    }
+    if (u.pathname === '/pwa-icon.svg' && req.method === 'GET') {
+      const s = DB.getSettings();
+      const ch = String(s.companyName || 'N').trim()[0]?.toUpperCase() || 'N';
+      const safeCh = ch.replace(/[<>&"]/g, '');
+      const hasImg = s.logo && /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,/i.test(s.logo);
+      const inner = hasImg
+        ? `<image href="${s.logo.replace(/"/g, '&quot;')}" x="56" y="56" width="400" height="400" preserveAspectRatio="xMidYMid meet"/>`
+        : `<text x="256" y="340" font-family="system-ui,-apple-system,sans-serif" font-size="260" font-weight="800" fill="#38bdf8" text-anchor="middle">${safeCh}</text>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#0f172a"/><rect x="16" y="16" width="480" height="480" rx="96" fill="#0284c7" fill-opacity="0.16" stroke="#0284c7" stroke-opacity="0.4" stroke-width="8"/>${inner}</svg>`;
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+      return res.end(svg);
     }
 
     // static files
