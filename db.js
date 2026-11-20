@@ -1,6 +1,7 @@
 // Persistent storage using Node's built-in SQLite (node:sqlite, Node >= 22.13). Multi-router aware.
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 const DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -44,6 +45,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS pop_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, pop_id INTEGER NOT NULL, router_id INTEGER NOT NULL,
     ts INTEGER NOT NULL, name TEXT NOT NULL, ip TEXT NOT NULL, event TEXT NOT NULL, detail TEXT NOT NULL DEFAULT ''
+  );
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    pass_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'noc',
+    name TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_events_r_ts ON events(router_id, ts);
   CREATE INDEX IF NOT EXISTS idx_events_r_name ON events(router_id, name, ts);
@@ -147,6 +156,90 @@ function listPopEvents(rid, limit = 100) {
     .all(rid, limit).map((r) => ({ ...r, ts: r.ts * 1000 }));
 }
 
+// ---- users & roles (admin / noc) ----
+function hashPass(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+function checkPass(pw, stored) {
+  const [salt, hash] = String(stored || '').split(':');
+  if (!salt || !hash) return false;
+  const test = crypto.scryptSync(String(pw), salt, 64);
+  const want = Buffer.from(hash, 'hex');
+  return test.length === want.length && crypto.timingSafeEqual(test, want);
+}
+function getAuthSecret() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = '_authSecret'").get();
+  if (row && row.value) return row.value;
+  const sec = crypto.randomBytes(32).toString('hex');
+  upSetting.run('_authSecret', sec);
+  return sec;
+}
+const pubUser = (u) => u ? { id: u.id, username: u.username, role: u.role === 'admin' ? 'admin' : 'noc', name: u.name || u.username, created_at: u.created_at } : null;
+const listUsers = () => db.prepare('SELECT id, username, role, name, created_at FROM users ORDER BY role ASC, id ASC').all().map(pubUser);
+const getUser = (id) => pubUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id));
+const getUserRaw = (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+const getUserByUsername = (u) => db.prepare('SELECT * FROM users WHERE username = ?').get(String(u || '').trim());
+
+function verifyUser(username, password) {
+  const u = getUserByUsername(username);
+  if (!u || !checkPass(password, u.pass_hash)) return null;
+  return pubUser(u);
+}
+function addUser({ username, password, role, name }) {
+  const un = String(username || '').trim().slice(0, 60);
+  if (!un || !/^[a-zA-Z0-9_.-]+$/.test(un)) throw new Error('Username hanya boleh huruf, angka, titik, strip, atau underscore');
+  if (!password || String(password).length < 4) throw new Error('Password minimal 4 karakter');
+  if (getUserByUsername(un)) throw new Error('Username sudah terdaftar');
+  const rl = role === 'admin' ? 'admin' : 'noc';
+  const nm = String(name || un).trim().slice(0, 100);
+  const info = db.prepare('INSERT INTO users (username, pass_hash, role, name, created_at) VALUES (?,?,?,?,?)')
+    .run(un, hashPass(password), rl, nm, Math.floor(Date.now() / 1000));
+  return getUser(Number(info.lastInsertRowid));
+}
+function countAdmins() {
+  return db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'admin'").get().c;
+}
+function updateUser(id, { username, password, role, name }) {
+  const cur = getUserRaw(id);
+  if (!cur) throw new Error('User tidak ditemukan');
+  let un = cur.username;
+  if (username !== undefined) {
+    un = String(username).trim().slice(0, 60);
+    if (!un || !/^[a-zA-Z0-9_.-]+$/.test(un)) throw new Error('Username tidak valid');
+    const ex = getUserByUsername(un);
+    if (ex && ex.id !== cur.id) throw new Error('Username sudah dipakai akun lain');
+  }
+  const rl = role !== undefined ? (role === 'admin' ? 'admin' : 'noc') : cur.role;
+  if (cur.role === 'admin' && rl !== 'admin' && countAdmins() <= 1) {
+    throw new Error('Tidak dapat mengubah role Admin terakhir menjadi NOC');
+  }
+  const nm = name !== undefined ? String(name).trim().slice(0, 100) : cur.name;
+  let ph = cur.pass_hash;
+  if (password) {
+    if (String(password).length < 4) throw new Error('Password minimal 4 karakter');
+    ph = hashPass(password);
+  }
+  db.prepare('UPDATE users SET username=?, pass_hash=?, role=?, name=? WHERE id=?').run(un, ph, rl, nm, id);
+  return getUser(id);
+}
+function deleteUser(id) {
+  const cur = getUserRaw(id);
+  if (!cur) throw new Error('User tidak ditemukan');
+  if (cur.role === 'admin' && countAdmins() <= 1) throw new Error('Tidak dapat menghapus akun Admin terakhir');
+  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+}
+function ensureDefaultUsers(envUser, envPass) {
+  const cnt = db.prepare('SELECT COUNT(*) c FROM users').get().c;
+  if (cnt === 0) {
+    const u = (envUser && String(envUser).trim()) || 'admin';
+    const p = (envPass && String(envPass).trim()) || 'admin123';
+    addUser({ username: u, password: p, role: 'admin', name: 'Administrator' });
+    console.log(`[auth] Akun Admin default dibuat: username="${u}"`);
+  }
+}
+
 // ---- aggregation: average all polls inside one SAMPLE_SEC window, then write one row ----
 const insSample = db.prepare('INSERT OR REPLACE INTO samples VALUES (?,?,?,?,?,?,?,?)');
 const insIf = db.prepare('INSERT OR REPLACE INTO if_samples VALUES (?,?,?,?,?,?)');
@@ -235,5 +328,6 @@ process.on('SIGINT', () => { flushAll(true); process.exit(0); });
 module.exports = {
   getSettings, setSettings, listRouters, getRouter, addRouter, updateRouter, deleteRouter,
   listPops, getPop, addPop, updatePop, deletePop, addPopEvent, listPopEvents,
+  listUsers, getUser, verifyUser, addUser, updateUser, deleteUser, ensureDefaultUsers, getAuthSecret,
   record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS,
 };

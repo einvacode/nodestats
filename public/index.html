@@ -26,6 +26,8 @@
       <select id="routerSel" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 sm:py-1.5 text-xs sm:text-sm max-w-[7.5rem] sm:max-w-xs truncate focus:outline-none focus:border-sky-500"></select>
       <button id="updBtn" title="Update aplikasi" class="relative h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm shrink-0">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
       <button id="mgrBtn" title="Kelola router" class="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-sm shrink-0">⚙</button>
+      <span id="userBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs"></span>
+      <button id="logoutBtn" title="Keluar / Logout" class="hidden h-8 px-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-rose-950/60 hover:border-rose-500/40 hover:text-rose-300 text-xs font-medium shrink-0">Keluar</button>
     </div>
   </div>
   <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
@@ -319,9 +321,12 @@
   <!-- company & logo settings -->
   <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <form id="setForm" class="lg:col-span-2 rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-5 min-w-0">
-      <div>
-        <h2 class="text-base font-semibold">Profil Perusahaan &amp; Logo</h2>
-        <p class="text-xs text-slate-400 mt-0.5">Ubah identitas dashboard, logo, dan informasi kontak perusahaan/ISP Anda.</p>
+      <div class="flex items-start justify-between gap-2 flex-wrap">
+        <div>
+          <h2 class="text-base font-semibold">Profil Perusahaan &amp; Logo</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Ubah identitas dashboard, logo, dan informasi kontak perusahaan/ISP Anda.</p>
+        </div>
+        <span id="companyNocLock" class="hidden px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium">🔒 Hanya Admin yang dapat mengubah data perusahaan</span>
       </div>
 
       <!-- logo uploader -->
@@ -385,6 +390,78 @@
           </button>
         </div>
       </div>
+
+      <!-- Ganti Password Sendiri (Admin & NOC) -->
+      <form id="pwForm" class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-3">
+        <div>
+          <h3 class="text-base font-semibold">Akun Saya</h3>
+          <p id="myAccInfo" class="text-xs text-slate-400 mt-0.5"></p>
+        </div>
+        <div class="space-y-2 text-sm">
+          <input id="pwOld" type="password" required placeholder="Password lama" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+          <input id="pwNew" type="password" required minlength="4" placeholder="Password baru (min. 4 karakter)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium">Ubah Password Saya</button>
+          <span id="pwMsg" class="text-xs"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Manajemen ID Admin & NOC (Khusus Admin) -->
+  <section id="userMgrSection" class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-4">
+    <div class="flex items-start justify-between gap-2 flex-wrap">
+      <div>
+        <h3 class="text-base font-semibold">Manajemen Akun User (Admin &amp; NOC)</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Buat ID login untuk <b>Admin</b> (akses penuh termasuk ubah data perusahaan &amp; kelola akun) dan <b>NOC</b> (bisa tambah/edit/hapus POP &amp; router, namun tidak bisa mengubah data perusahaan).</p>
+      </div>
+    </div>
+
+    <form id="uForm" class="rounded-xl bg-slate-950/60 border border-slate-800 p-4 space-y-3">
+      <h4 id="uFormTitle" class="text-xs font-semibold uppercase tracking-wider text-sky-400">Tambah Akun Baru</h4>
+      <input type="hidden" id="uId">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">ID / Username *</span>
+          <input id="uUsername" required placeholder="mis. noc1 / budi" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Nama / Label</span>
+          <input id="uName" placeholder="mis. NOC Shift Pagi" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Role / Hak Akses *</span>
+          <select id="uRole" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+            <option value="noc">NOC (Operasional Router &amp; POP)</option>
+            <option value="admin">Admin (Akses Penuh + Data Perusahaan)</option>
+          </select>
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Password *</span>
+          <input id="uPass" type="password" required minlength="4" placeholder="Min. 4 karakter" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+        </label>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="submit" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium">Simpan Akun</button>
+        <button type="button" id="uCancelBtn" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs">Batal Edit</button>
+        <span id="uFormMsg" class="text-xs"></span>
+      </div>
+    </form>
+
+    <div class="overflow-x-auto border border-slate-800 rounded-xl">
+      <table class="w-full text-sm">
+        <thead class="text-xs text-slate-500 bg-slate-950">
+          <tr>
+            <th class="text-left px-4 py-2">ID / Username</th>
+            <th class="text-left px-4 py-2">Nama</th>
+            <th class="text-left px-4 py-2">Role</th>
+            <th class="text-left px-4 py-2 hidden sm:table-cell">Hak Akses</th>
+            <th class="text-right px-4 py-2">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="uBody" class="divide-y divide-slate-800"></tbody>
+      </table>
     </div>
   </section>
   </div>
@@ -457,6 +534,29 @@
     </div>
   </div>
 </div>
+<div id="loginOverlay" class="hidden fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-4">
+  <form id="loginForm" class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 space-y-5 shadow-2xl">
+    <div class="flex items-center gap-3">
+      <div id="loginLogoBox" class="h-12 w-12 rounded-xl bg-sky-500/20 text-sky-400 grid place-items-center text-xl font-bold overflow-hidden shrink-0">N</div>
+      <div class="min-w-0">
+        <h2 id="loginBrandName" class="text-lg font-bold truncate">NodeStats</h2>
+        <p class="text-xs text-slate-400">Masuk dengan ID Admin atau NOC</p>
+      </div>
+    </div>
+    <div class="space-y-3 text-sm">
+      <label class="block space-y-1">
+        <span class="text-xs text-slate-400">ID / Username</span>
+        <input id="loginUser" required autocomplete="username" placeholder="mis. admin / noc" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+      </label>
+      <label class="block space-y-1">
+        <span class="text-xs text-slate-400">Password</span>
+        <input id="loginPass" type="password" required autocomplete="current-password" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+      </label>
+    </div>
+    <p id="loginMsg" class="text-xs text-rose-400 min-h-[1rem]"></p>
+    <button type="submit" id="loginBtn" class="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-semibold text-sm text-white transition">Masuk Dashboard</button>
+  </form>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const fmtBps = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' Gbps' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' Mbps' : b >= 1e3 ? (b / 1e3).toFixed(0) + ' Kbps' : Math.round(b) + ' bps';
@@ -479,8 +579,18 @@ function setChart(c, labels, ...series) {
   c.data.labels = labels; series.forEach((s, i) => (c.data.datasets[i].data = s)); c.update();
 }
 const _fetch = window.fetch.bind(window);
-window.fetch = (u, o = {}) => _fetch(u, { ...o, headers: { 'X-Requested-With': 'nodestats', ...(o.headers || {}) } });
 const ST = JSON.parse(localStorage.getItem('nodestats') || '{}');
+let authToken = ST.authToken || '';
+let currentUser = null;
+window.fetch = async (u, o = {}) => {
+  const headers = { 'X-Requested-With': 'nodestats', ...(o.headers || {}) };
+  if (authToken) headers['X-Auth-Token'] = authToken;
+  const r = await _fetch(u, { ...o, headers });
+  if (r.status === 401 && !String(u).startsWith('/api/auth/')) {
+    showLoginScreen();
+  }
+  return r;
+};
 let rid = +ST.router || 0;
 const rq = (u, o) => fetch(u + (u.includes('?') ? '&' : '?') + 'router=' + rid, o);
 const save = (o) => { Object.assign(ST, o); localStorage.setItem('nodestats', JSON.stringify(ST)); };
@@ -982,6 +1092,7 @@ function applyBranding(s) {
   $('brandTagline').textContent = cfg.tagline || '';
   $('brandTagline').classList.toggle('hidden', !cfg.tagline);
   renderLogoBox($('brandLogoBox'), cfg.logo, name);
+  if ($('loginLogoBox')) { renderLogoBox($('loginLogoBox'), cfg.logo, name); $('loginBrandName').textContent = name; }
   $('favicon').href = cfg.logo || 'data:,';
   const left = [cfg.footer || (`© ${new Date().getFullYear()} ${name}`), cfg.address].filter(Boolean).map(esc).join(' · ');
   const right = [cfg.contact, cfg.website].filter(Boolean).map(esc).join(' · ');
@@ -1053,6 +1164,212 @@ $('setForm').onsubmit = async (e) => {
 $('sOpenMgr').onclick = () => openMgr();
 $('sOpenUpd').onclick = () => $('updBtn').click();
 loadSettings();
+
+// ---- Auth & Role Management (Admin vs NOC) ----
+let usersList = [];
+function showLoginScreen() {
+  $('loginOverlay').classList.remove('hidden');
+}
+function hideLoginScreen() {
+  $('loginOverlay').classList.add('hidden');
+}
+function applyRolePermissions() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (currentUser) {
+    const badgeColor = isAdmin ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+    $('userBadge').innerHTML = `<span class="font-medium text-slate-200">${esc(currentUser.username)}</span><span class="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase border ${badgeColor}">${esc(currentUser.role)}</span>`;
+    $('userBadge').classList.remove('hidden');
+    $('logoutBtn').classList.remove('hidden');
+    $('myAccInfo').innerHTML = `Login sebagai <b class="text-slate-200">${esc(currentUser.name || currentUser.username)}</b> (<code class="text-sky-400">${esc(currentUser.username)}</code>) · Role: <b class="uppercase ${isAdmin ? 'text-sky-400' : 'text-emerald-400'}">${esc(currentUser.role)}</b>`;
+  } else {
+    $('userBadge').classList.add('hidden');
+    $('logoutBtn').classList.add('hidden');
+  }
+
+  // NOC cannot edit company profile & logo
+  $('companyNocLock').classList.toggle('hidden', isAdmin);
+  ['sCompanyName', 'sTagline', 'sContact', 'sWebsite', 'sAddress', 'sFooter', 'sLogoFile', 'sLogoClear'].forEach((id) => {
+    if ($(id)) $(id).disabled = !isAdmin;
+  });
+  const saveCompanyBtn = $('setForm').querySelector('button[type="submit"]');
+  if (saveCompanyBtn) {
+    saveCompanyBtn.disabled = !isAdmin;
+    saveCompanyBtn.classList.toggle('opacity-40', !isAdmin);
+    saveCompanyBtn.classList.toggle('cursor-not-allowed', !isAdmin);
+  }
+  const uploadLbl = $('sLogoFile')?.closest('label');
+  if (uploadLbl) {
+    uploadLbl.classList.toggle('opacity-40', !isAdmin);
+    uploadLbl.classList.toggle('pointer-events-none', !isAdmin);
+  }
+
+  // Only Admin can manage Admin/NOC user accounts & trigger app update
+  $('userMgrSection').classList.toggle('hidden', !isAdmin);
+  $('updBtn').classList.toggle('hidden', !isAdmin);
+  $('sOpenUpd').classList.toggle('hidden', !isAdmin);
+  if (isAdmin) loadUsers();
+}
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    if (d.settings) { applyBranding(d.settings); fillSettingsForm(); }
+    if (d.user) {
+      currentUser = d.user;
+      hideLoginScreen();
+      applyRolePermissions();
+      return true;
+    }
+  } catch (e) { console.error(e); }
+  showLoginScreen();
+  return false;
+}
+
+$('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('loginMsg').textContent = '';
+  $('loginBtn').disabled = true;
+  $('loginBtn').textContent = 'Memeriksa…';
+  try {
+    const r = await _fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'nodestats', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: $('loginUser').value.trim(), password: $('loginPass').value }),
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      $('loginMsg').textContent = d.error || 'Gagal login';
+      $('loginBtn').disabled = false;
+      $('loginBtn').textContent = 'Masuk Dashboard';
+      return;
+    }
+    authToken = d.token || '';
+    save({ authToken });
+    currentUser = d.user;
+    $('loginPass').value = '';
+    hideLoginScreen();
+    applyRolePermissions();
+    n = 0; tick();
+  } catch (err) {
+    $('loginMsg').textContent = 'Gagal: ' + err.message;
+  }
+  $('loginBtn').disabled = false;
+  $('loginBtn').textContent = 'Masuk Dashboard';
+};
+
+$('logoutBtn').onclick = async () => {
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+  authToken = '';
+  save({ authToken: '' });
+  currentUser = null;
+  showLoginScreen();
+};
+
+$('pwForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('pwMsg').textContent = 'Menyimpan…'; $('pwMsg').className = 'text-xs text-slate-400';
+  try {
+    const r = await fetch('/api/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ oldPassword: $('pwOld').value, newPassword: $('pwNew').value }),
+    });
+    const d = await r.json();
+    if (d.error) { $('pwMsg').textContent = d.error; $('pwMsg').className = 'text-xs text-rose-400'; return; }
+    $('pwForm').reset();
+    $('pwMsg').textContent = '✓ Password berhasil diubah'; $('pwMsg').className = 'text-xs text-emerald-400';
+  } catch (err) {
+    $('pwMsg').textContent = 'Gagal: ' + err.message; $('pwMsg').className = 'text-xs text-rose-400';
+  }
+};
+
+function renderUsers() {
+  $('uBody').innerHTML = usersList.map((u) => {
+    const isAdm = u.role === 'admin';
+    const isMe = currentUser && u.id === currentUser.id;
+    return `<tr class="hover:bg-slate-800/40">
+      <td class="px-4 py-2 font-mono font-medium text-sky-300">${esc(u.username)}${isMe ? ' <span class="text-[10px] text-slate-400 font-sans">(Anda)</span>' : ''}</td>
+      <td class="px-4 py-2">${esc(u.name || '-')}</td>
+      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs font-bold uppercase ${isAdm ? 'bg-sky-500/20 text-sky-300' : 'bg-emerald-500/20 text-emerald-300'}">${esc(u.role)}</span></td>
+      <td class="px-4 py-2 text-xs text-slate-400 hidden sm:table-cell">${isAdm ? 'Akses penuh (Data Perusahaan, Akun, Router, POP)' : 'Tambah/Edit/Hapus POP & Router (Tanpa Data Perusahaan)'}</td>
+      <td class="px-4 py-2 text-right whitespace-nowrap">
+        <div class="inline-flex gap-1 text-xs">
+          <button data-u-act="edit" data-id="${u.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
+          ${isMe ? '' : `<button data-u-act="del" data-id="${u.id}" class="px-2.5 py-1 rounded bg-rose-600/70 hover:bg-rose-600 text-white">Hapus</button>`}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadUsers() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  try {
+    const r = await fetch('/api/users');
+    if (r.ok) { usersList = await r.json(); renderUsers(); }
+  } catch (e) { console.error(e); }
+}
+
+function resetUserForm() {
+  $('uForm').reset();
+  $('uId').value = '';
+  $('uFormTitle').textContent = 'Tambah Akun Baru';
+  $('uPass').required = true;
+  $('uPass').placeholder = 'Min. 4 karakter';
+  $('uCancelBtn').classList.add('hidden');
+  $('uFormMsg').textContent = '';
+}
+$('uCancelBtn').onclick = resetUserForm;
+
+$('uForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const id = $('uId').value;
+  $('uFormMsg').textContent = 'Menyimpan…'; $('uFormMsg').className = 'text-xs text-slate-400';
+  try {
+    const body = {
+      username: $('uUsername').value.trim(),
+      name: $('uName').value.trim(),
+      role: $('uRole').value,
+      password: $('uPass').value || undefined,
+    };
+    const r = await fetch(id ? '/api/users/' + id : '/api/users', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) { $('uFormMsg').textContent = d.error; $('uFormMsg').className = 'text-xs text-rose-400'; return; }
+    usersList = d.users || [];
+    renderUsers();
+    resetUserForm();
+    $('uFormMsg').textContent = '✓ Akun tersimpan'; $('uFormMsg').className = 'text-xs text-emerald-400';
+    setTimeout(() => { if ($('uFormMsg').textContent.startsWith('✓')) $('uFormMsg').textContent = ''; }, 3000);
+  } catch (err) {
+    $('uFormMsg').textContent = 'Gagal: ' + err.message; $('uFormMsg').className = 'text-xs text-rose-400';
+  }
+};
+
+$('uBody').onclick = async (e) => {
+  const b = e.target.closest('button[data-u-act]');
+  if (!b) return;
+  const id = +b.dataset.id, u = usersList.find((x) => x.id === id);
+  if (!u) return;
+  if (b.dataset.uAct === 'edit') {
+    $('uId').value = u.id;
+    $('uUsername').value = u.username;
+    $('uName').value = u.name || '';
+    $('uRole').value = u.role;
+    $('uPass').value = '';
+    $('uPass').required = false;
+    $('uPass').placeholder = 'Kosongkan jika tidak diubah';
+    $('uFormTitle').textContent = 'Edit Akun: ' + u.username;
+    $('uCancelBtn').classList.remove('hidden');
+    $('uFormMsg').textContent = '';
+    $('uUsername').focus();
+  } else if (b.dataset.uAct === 'del' && confirm(`Hapus akun "${u.username}" (${u.role.toUpperCase()})?`)) {
+    const r = await fetch('/api/users/' + id, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.error) return alert(d.error);
+    usersList = d.users || [];
+    renderUsers();
+  }
+};
 
 let mUser = '';
 async function openUser(name) {
@@ -1213,10 +1530,11 @@ $('uApply').onclick = async () => {
   } catch (e) { uMsg('Gagal: ' + e.message, 'text-rose-400'); $('uApply').disabled = false; }
 };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeUpd(); });
-loadUpd(); setInterval(loadUpd, 10 * 60 * 1000);
+setInterval(() => { if (currentUser) loadUpd(); }, 10 * 60 * 1000);
 
 let n = 0;
 async function tick() {
+  if (!currentUser) return;
   try {
     await loadRouters();
     if (!rid) { $('routerInfo').textContent = 'Belum ada router'; $('statusBadge').textContent = '● -'; if (!ST.askedAdd) { save({ askedAdd: 1 }); openMgr(); } return; }
@@ -1233,7 +1551,12 @@ async function tick() {
     $('live').className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
   } catch (e) { console.error(e); $('live').className = 'h-2 w-2 rounded-full bg-rose-500'; }
 }
-tick().then(() => { if (ST.scroll) window.scrollTo(0, ST.scroll); });
+checkAuth().then((ok) => {
+  if (ok) {
+    loadUpd();
+    tick().then(() => { if (ST.scroll) window.scrollTo(0, ST.scroll); });
+  }
+});
 let sT;
 window.addEventListener('scroll', () => {
   clearTimeout(sT); sT = setTimeout(() => save({ scroll: Math.round(window.scrollY) }), 150);

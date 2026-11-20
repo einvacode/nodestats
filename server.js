@@ -5,6 +5,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // ---- config (.env) ----
 try {
@@ -332,32 +333,135 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(new Error('JSON tidak valid')); } });
 });
 
-// ---- HTTP ----
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-const send = (res, code, o) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
-http.createServer(async (req, res) => {
-  if (CFG.dashUser) {
-    const want = 'Basic ' + Buffer.from(`${CFG.dashUser}:${CFG.dashPass}`).toString('base64');
-    if (req.headers.authorization !== want) { res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="NodeStats"' }); return res.end('Auth required'); }
+// ---- HTTP & Auth (Admin / NOC) ----
+DB.ensureDefaultUsers(CFG.dashUser, CFG.dashPass);
+const AUTH_SECRET = DB.getAuthSecret();
+function signSession(u) {
+  const payload = Buffer.from(JSON.stringify({ id: u.id, exp: Math.floor(Date.now() / 1000) + 30 * 86400 })).toString('base64url');
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+function verifySession(tok) {
+  if (!tok || typeof tok !== 'string' || !tok.includes('.')) return null;
+  const [payload, sig] = tok.split('.');
+  const want = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+  if (sig !== want) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (!d.id || (d.exp && d.exp < Math.floor(Date.now() / 1000))) return null;
+    return DB.getUser(d.id);
+  } catch { return null; }
+}
+function parseCookies(req) {
+  const out = {};
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
   }
+  return out;
+}
+function getAuthUser(req) {
+  const cookies = parseCookies(req);
+  const tok = cookies.ns_sess || req.headers['x-auth-token'];
+  if (tok) {
+    const u = verifySession(tok);
+    if (u) return u;
+  }
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Basic ')) {
+    const raw = Buffer.from(auth.slice(6), 'base64').toString();
+    const idx = raw.indexOf(':');
+    if (idx > 0) {
+      const u = DB.verifyUser(raw.slice(0, idx), raw.slice(idx + 1));
+      if (u) return u;
+    }
+  }
+  return null;
+}
+
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+const send = (res, code, o, extraHeaders = {}) => {
+  res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extraHeaders });
+  res.end(JSON.stringify(o));
+};
+http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), q = u.searchParams, now = Math.floor(Date.now() / 1000);
   try {
     // CSRF guard: state-changing calls must carry a custom header (forces a CORS preflight for cross-site pages)
     if (req.method !== 'GET' && u.pathname.startsWith('/api/') && req.headers['x-requested-with'] !== 'nodestats') return send(res, 403, { error: 'forbidden' });
-    // company / app settings
+
+    const authUser = getAuthUser(req);
+
+    // auth endpoints
+    if (u.pathname === '/api/auth/me' && req.method === 'GET') {
+      return send(res, 200, { user: authUser, settings: DB.getSettings() });
+    }
+    if (u.pathname === '/api/auth/login' && req.method === 'POST') {
+      const b = await readBody(req);
+      const user = DB.verifyUser(b.username, b.password);
+      if (!user) return send(res, 401, { error: 'Username atau password salah' });
+      const tok = signSession(user);
+      const cookie = `ns_sess=${encodeURIComponent(tok)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}`;
+      return send(res, 200, { user, token: tok }, { 'Set-Cookie': cookie });
+    }
+    if (u.pathname === '/api/auth/logout' && req.method === 'POST') {
+      return send(res, 200, { ok: true }, { 'Set-Cookie': 'ns_sess=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
+    }
+
+    // company / app settings (GET is public for branding on login page; POST/PUT requires Admin)
     if (u.pathname === '/api/settings' && req.method === 'GET') return send(res, 200, DB.getSettings());
+
+    // All other /api/* endpoints require authentication
+    if (u.pathname.startsWith('/api/') && !authUser) {
+      return send(res, 401, { error: 'Silakan login terlebih dahulu' });
+    }
+
+    if (u.pathname === '/api/auth/password' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (!DB.verifyUser(authUser.username, b.oldPassword)) return send(res, 400, { error: 'Password lama tidak sesuai' });
+      const updated = DB.updateUser(authUser.id, { password: b.newPassword });
+      return send(res, 200, { ok: true, user: updated });
+    }
+
     if (u.pathname === '/api/settings' && (req.method === 'POST' || req.method === 'PUT')) {
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Akses ditolak: Hanya Admin yang dapat mengubah data perusahaan' });
       const b = await readBody(req);
       if (b.logo && !/^(data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,|https?:\/\/)/i.test(String(b.logo).trim())) {
         return send(res, 400, { error: 'Format logo harus gambar (PNG/JPG/WEBP/SVG) atau URL http(s)' });
       }
       return send(res, 200, DB.setSettings(b));
     }
+
+    // user management (Admin only)
+    if (u.pathname === '/api/users' && req.method === 'GET') {
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat melihat daftar akun' });
+      return send(res, 200, DB.listUsers());
+    }
+    if (u.pathname === '/api/users' && req.method === 'POST') {
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat membuat akun' });
+      const b = await readBody(req);
+      const created = DB.addUser({ username: b.username, password: b.password, role: b.role, name: b.name });
+      return send(res, 200, { user: created, users: DB.listUsers() });
+    }
+    const mu = u.pathname.match(/^\/api\/users\/(\d+)$/);
+    if (mu && req.method === 'PUT') {
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat mengubah akun' });
+      const b = await readBody(req);
+      const updated = DB.updateUser(+mu[1], { username: b.username, password: b.password, role: b.role, name: b.name });
+      return send(res, 200, { user: updated, users: DB.listUsers() });
+    }
+    if (mu && req.method === 'DELETE') {
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat menghapus akun' });
+      if (+mu[1] === authUser.id) return send(res, 400, { error: 'Tidak dapat menghapus akun yang sedang Anda gunakan login' });
+      DB.deleteUser(+mu[1]);
+      return send(res, 200, { ok: true, users: DB.listUsers() });
+    }
+
     // self update (git)
     if (u.pathname === '/api/update/status' && req.method === 'GET') return send(res, 200, await UPD.status());
     if (u.pathname === '/api/update/check' && req.method === 'POST') return send(res, 200, await UPD.check());
     if (u.pathname === '/api/update/apply' && req.method === 'POST') {
-      if (!CFG.dashUser) return send(res, 403, { error: 'Isi DASH_USER/DASH_PASS dulu sebelum memakai update' });
+      if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat melakukan update aplikasi' });
       return send(res, 200, await UPD.apply());
     }
     // router management
