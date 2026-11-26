@@ -197,9 +197,9 @@ try {
 
   <!-- KPI cards -->
   <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Online</p><p id="kOnline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5 truncate">-</p></div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Offline</p><p id="kOffline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5 truncate">-</p></div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Total Secret</p><p id="kEnabled" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kDisabled" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate"></p></div>
+    <div id="kOnlineCard" class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0 cursor-pointer hover:border-slate-700 transition" title="Klik untuk lihat daftar PPPoE Online"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Online</p><p id="kOnline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5 truncate">-</p></div>
+    <div id="kOfflineCard" class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0 cursor-pointer hover:border-slate-700 transition" title="Klik untuk lihat daftar PPPoE Offline"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Offline</p><p id="kOffline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5 truncate">-</p></div>
+    <div id="kTotalCard" class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0 cursor-pointer hover:border-slate-700 transition" title="Klik untuk lihat semua Pelanggan PPPoE"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Total Secret</p><p id="kEnabled" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kDisabled" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate"></p></div>
     <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0">
       <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Rasio PPPoE</p><p id="kPct" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-sky-400 mt-0.5 truncate">-</p>
       <div class="h-1.5 rounded bg-slate-800 mt-2 overflow-hidden"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
@@ -1219,6 +1219,17 @@ $('popAlarmMuteBtn').onclick = () => {
 const openPopTab = () => {
   mainTab = 'network'; netTab = 'pop'; save({ mainTab, netTab, tab: 'pop' }); showTab(); loadPops();
 };
+const openPppoeTab = (statusFilter) => {
+  mainTab = 'network'; netTab = 'pppoe';
+  if (statusFilter) { $('pStatus').value = statusFilter; page = 1; }
+  save({ mainTab, netTab, tab: 'pppoe', pStatus: $('pStatus').value, page });
+  showTab();
+  $('pScroll').scrollTop = 0;
+  loadPppoe();
+};
+$('kOfflineCard').onclick = () => openPppoeTab('offline');
+$('kOnlineCard').onclick = () => openPppoeTab('online');
+$('kTotalCard').onclick = () => openPppoeTab('all');
 $('popAlarmGoBtn').onclick = openPopTab;
 $('kPopCard').onclick = openPopTab;
 $('kPopPctCard').onclick = openPopTab;
