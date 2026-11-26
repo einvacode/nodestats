@@ -52,12 +52,16 @@ db.exec(`
     pass_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'noc',
     name TEXT NOT NULL DEFAULT '',
+    router_ids TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_events_r_ts ON events(router_id, ts);
   CREATE INDEX IF NOT EXISTS idx_events_r_name ON events(router_id, name, ts);
   CREATE INDEX IF NOT EXISTS idx_pop_events_r_ts ON pop_events(router_id, ts);
 `);
+if (!hasCol('users', 'router_ids')) {
+  db.exec("ALTER TABLE users ADD COLUMN router_ids TEXT NOT NULL DEFAULT ''");
+}
 if (legacy) {
   db.exec(`INSERT INTO samples SELECT 1, ts, online, offline, cpu, mem, rx, tx FROM samples_old;
     INSERT INTO if_samples SELECT 1, name, ts, rx, tx, up FROM if_samples_old;
@@ -218,8 +222,20 @@ function getAuthSecret() {
   upSetting.run('_authSecret', sec);
   return sec;
 }
-const pubUser = (u) => u ? { id: u.id, username: u.username, role: u.role === 'admin' ? 'admin' : 'noc', name: u.name || u.username, created_at: u.created_at } : null;
-const listUsers = () => db.prepare('SELECT id, username, role, name, created_at FROM users ORDER BY role ASC, id ASC').all().map(pubUser);
+function parseRouterIds(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return [...new Set(v.map((x) => +x).filter((x) => x > 0))];
+  return [...new Set(String(v).split(',').map((x) => +x.trim()).filter((x) => x > 0))];
+}
+const pubUser = (u) => u ? {
+  id: u.id,
+  username: u.username,
+  role: u.role === 'admin' ? 'admin' : 'noc',
+  name: u.name || u.username,
+  routerIds: u.role === 'admin' ? [] : parseRouterIds(u.router_ids),
+  created_at: u.created_at,
+} : null;
+const listUsers = () => db.prepare('SELECT id, username, role, name, router_ids, created_at FROM users ORDER BY role ASC, id ASC').all().map(pubUser);
 const getUser = (id) => pubUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id));
 const getUserRaw = (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 const getUserByUsername = (u) => db.prepare('SELECT * FROM users WHERE username = ?').get(String(u || '').trim());
@@ -229,21 +245,22 @@ function verifyUser(username, password) {
   if (!u || !checkPass(password, u.pass_hash)) return null;
   return pubUser(u);
 }
-function addUser({ username, password, role, name }) {
+function addUser({ username, password, role, name, routerIds }) {
   const un = String(username || '').trim().slice(0, 60);
   if (!un || !/^[a-zA-Z0-9_.-]+$/.test(un)) throw new Error('Username hanya boleh huruf, angka, titik, strip, atau underscore');
   if (!password || String(password).length < 4) throw new Error('Password minimal 4 karakter');
   if (getUserByUsername(un)) throw new Error('Username sudah terdaftar');
   const rl = role === 'admin' ? 'admin' : 'noc';
   const nm = String(name || un).trim().slice(0, 100);
-  const info = db.prepare('INSERT INTO users (username, pass_hash, role, name, created_at) VALUES (?,?,?,?,?)')
-    .run(un, hashPass(password), rl, nm, Math.floor(Date.now() / 1000));
+  const rids = rl === 'admin' ? '' : parseRouterIds(routerIds).join(',');
+  const info = db.prepare('INSERT INTO users (username, pass_hash, role, name, router_ids, created_at) VALUES (?,?,?,?,?,?)')
+    .run(un, hashPass(password), rl, nm, rids, Math.floor(Date.now() / 1000));
   return getUser(Number(info.lastInsertRowid));
 }
 function countAdmins() {
   return db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'admin'").get().c;
 }
-function updateUser(id, { username, password, role, name }) {
+function updateUser(id, { username, password, role, name, routerIds }) {
   const cur = getUserRaw(id);
   if (!cur) throw new Error('User tidak ditemukan');
   let un = cur.username;
@@ -258,12 +275,13 @@ function updateUser(id, { username, password, role, name }) {
     throw new Error('Tidak dapat mengubah role Admin terakhir menjadi NOC');
   }
   const nm = name !== undefined ? String(name).trim().slice(0, 100) : cur.name;
+  const rids = rl === 'admin' ? '' : (routerIds !== undefined ? parseRouterIds(routerIds).join(',') : (cur.router_ids || ''));
   let ph = cur.pass_hash;
   if (password) {
     if (String(password).length < 4) throw new Error('Password minimal 4 karakter');
     ph = hashPass(password);
   }
-  db.prepare('UPDATE users SET username=?, pass_hash=?, role=?, name=? WHERE id=?').run(un, ph, rl, nm, id);
+  db.prepare('UPDATE users SET username=?, pass_hash=?, role=?, name=?, router_ids=? WHERE id=?').run(un, ph, rl, nm, rids, id);
   return getUser(id);
 }
 function deleteUser(id) {

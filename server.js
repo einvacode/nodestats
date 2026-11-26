@@ -742,14 +742,14 @@ http.createServer(async (req, res) => {
     if (u.pathname === '/api/users' && req.method === 'POST') {
       if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat membuat akun' });
       const b = await readBody(req);
-      const created = DB.addUser({ username: b.username, password: b.password, role: b.role, name: b.name });
+      const created = DB.addUser({ username: b.username, password: b.password, role: b.role, name: b.name, routerIds: b.routerIds });
       return send(res, 200, { user: created, users: DB.listUsers() });
     }
     const mu = u.pathname.match(/^\/api\/users\/(\d+)$/);
     if (mu && req.method === 'PUT') {
       if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat mengubah akun' });
       const b = await readBody(req);
-      const updated = DB.updateUser(+mu[1], { username: b.username, password: b.password, role: b.role, name: b.name });
+      const updated = DB.updateUser(+mu[1], { username: b.username, password: b.password, role: b.role, name: b.name, routerIds: b.routerIds });
       return send(res, 200, { user: updated, users: DB.listUsers() });
     }
     if (mu && req.method === 'DELETE') {
@@ -766,13 +766,23 @@ http.createServer(async (req, res) => {
       if (authUser.role !== 'admin') return send(res, 403, { error: 'Hanya Admin yang dapat melakukan update aplikasi' });
       return send(res, 200, await UPD.apply());
     }
+
+    // Helper: check which routers this user is allowed to access (empty routerIds = all routers)
+    const isRestrictedUser = authUser.role !== 'admin' && Array.isArray(authUser.routerIds) && authUser.routerIds.length > 0;
+    const canAccessRouter = (id) => !isRestrictedUser || authUser.routerIds.includes(+id);
+
     // router management
-    if (u.pathname === '/api/routers' && req.method === 'GET') return send(res, 200, DB.listRouters().map(publicRouter));
+    if (u.pathname === '/api/routers' && req.method === 'GET') {
+      const list = DB.listRouters().filter((r) => canAccessRouter(r.id)).map(publicRouter);
+      return send(res, 200, list);
+    }
     if (u.pathname === '/api/routers' && req.method === 'POST') {
+      if (isRestrictedUser) return send(res, 403, { error: 'Akun Anda dibatasi pada router tertentu dan tidak dapat menambah router baru' });
       const row = DB.addRouter(cleanInput(await readBody(req))); startCollector(row); return send(res, 200, publicRouter(row));
     }
     if (u.pathname === '/api/routers/test' && req.method === 'POST') {
       const b = await readBody(req), saved = b.id ? DB.getRouter(+b.id) : null;
+      if (b.id && !canAccessRouter(+b.id)) return send(res, 403, { error: 'Akses router ditolak' });
       const cfg = { ...(saved || {}), ...cleanInput(b, true) };
       if (!b.pass && saved) cfg.pass = saved.pass;
       if (cfg.host === 'demo') return send(res, 200, { ok: true, identity: 'DEMO', version: 'demo' });
@@ -783,17 +793,22 @@ http.createServer(async (req, res) => {
     }
     const m = u.pathname.match(/^\/api\/routers\/(\d+)$/);
     if (m && req.method === 'PUT') {
+      if (!canAccessRouter(+m[1])) return send(res, 403, { error: 'Akses router ditolak' });
       const row = DB.updateRouter(+m[1], cleanInput(await readBody(req), true));
       if (!row) return send(res, 404, { error: 'not found' });
       startCollector(row); return send(res, 200, publicRouter(row));
     }
     if (m && req.method === 'DELETE') {
+      if (isRestrictedUser) return send(res, 403, { error: 'Akun Anda tidak diizinkan menghapus router' });
       const c = collectors.get(+m[1]); if (c) c.stop(); collectors.delete(+m[1]); DB.deleteRouter(+m[1]); return send(res, 200, { ok: true });
     }
 
     // per-router data
     if (u.pathname.startsWith('/api/')) {
-      const rid = +q.get('router') || [...collectors.keys()][0];
+      const allowedIds = [...collectors.keys()].filter((id) => canAccessRouter(id));
+      const reqRid = +q.get('router');
+      if (reqRid && !canAccessRouter(reqRid)) return send(res, 403, { error: 'Anda tidak memiliki akses ke router ini' });
+      const rid = (reqRid && allowedIds.includes(reqRid)) ? reqRid : allowedIds[0];
       const c = collectors.get(rid);
       if (!c) return send(res, 404, { error: 'no router' });
       if (u.pathname === '/api/summary') return send(res, 200, { ...c.summary(), routerId: c.id });

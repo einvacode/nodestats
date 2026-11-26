@@ -677,8 +677,15 @@ try {
           <input id="uPass" type="password" required minlength="4" placeholder="Min. 4 karakter" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
         </label>
       </div>
+      <div id="uRouterAccessBox" class="space-y-1.5 pt-1">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <span class="text-xs text-slate-400 font-medium">Akses Router yang Diizinkan (Khusus NOC)</span>
+          <span class="text-[11px] text-slate-500">Biarkan tidak dicentang untuk mengizinkan akses ke <b>Semua Router</b>, atau centang router tertentu saja.</span>
+        </div>
+        <div id="uRoutersCheckList" class="flex flex-wrap gap-2 pt-0.5"></div>
+      </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button type="submit" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium">Simpan Akun</button>
+        <button type="submit" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium">Simpan Akun</button>
         <button type="button" id="uCancelBtn" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs">Batal Edit</button>
         <span id="uFormMsg" class="text-xs"></span>
       </div>
@@ -691,7 +698,7 @@ try {
             <th class="text-left px-4 py-2">ID / Username</th>
             <th class="text-left px-4 py-2">Nama</th>
             <th class="text-left px-4 py-2">Role</th>
-            <th class="text-left px-4 py-2 hidden sm:table-cell">Hak Akses</th>
+            <th class="text-left px-4 py-2">Akses Router</th>
             <th class="text-right px-4 py-2">Aksi</th>
           </tr>
         </thead>
@@ -1667,10 +1674,15 @@ function applyRolePermissions() {
   }
 
   // Only Admin can manage Admin/NOC user accounts & trigger app update
+  const isRestrictedNoc = !isAdmin && currentUser && Array.isArray(currentUser.routerIds) && currentUser.routerIds.length > 0;
   $('userMgrSection').classList.toggle('hidden', !isAdmin);
   $('updBtn').classList.toggle('hidden', !isAdmin);
   $('updBtn').classList.toggle('grid', isAdmin);
   $('sOpenUpd').classList.toggle('hidden', !isAdmin);
+  // Hide Add/Delete Router Manager button if this NOC account is restricted to specific routers
+  $('mgrBtn').classList.toggle('hidden', isRestrictedNoc);
+  $('mgrBtn').classList.toggle('grid', !isRestrictedNoc);
+  $('sOpenMgr').classList.toggle('hidden', isRestrictedNoc);
   if (currentUser) loadTelegramSettings();
   if (isAdmin) loadUsers();
 }
@@ -1748,15 +1760,42 @@ $('pwForm').onsubmit = async (e) => {
   }
 };
 
+function renderUserRouterChecks(selectedIds = []) {
+  const box = $('uRoutersCheckList');
+  if (!box) return;
+  const selSet = new Set((selectedIds || []).map((x) => +x));
+  if (!routers.length) {
+    box.innerHTML = '<span class="text-xs text-slate-500">Belum ada router terdaftar.</span>';
+    return;
+  }
+  box.innerHTML = routers.map((r) => `
+    <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs cursor-pointer select-none hover:border-sky-500/60">
+      <input type="checkbox" name="uRouterId" value="${r.id}" ${selSet.has(r.id) ? 'checked' : ''} class="h-3.5 w-3.5 rounded accent-sky-500">
+      <span class="font-medium text-slate-200">${esc(r.name)}</span>
+    </label>
+  `).join('');
+}
+$('uRole').onchange = () => {
+  $('uRouterAccessBox').classList.toggle('hidden', $('uRole').value === 'admin');
+};
+
 function renderUsers() {
+  const rNameMap = new Map(routers.map((r) => [r.id, r.name]));
   $('uBody').innerHTML = usersList.map((u) => {
     const isAdm = u.role === 'admin';
     const isMe = currentUser && u.id === currentUser.id;
+    const rids = Array.isArray(u.routerIds) ? u.routerIds : [];
+    let accessHtml = '<span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300">Semua Router</span>';
+    if (isAdm) {
+      accessHtml = '<span class="text-xs text-slate-400">Semua Router + Pengaturan Penuh</span>';
+    } else if (rids.length > 0) {
+      accessHtml = `<div class="flex flex-wrap gap-1">${rids.map((id) => `<span class="px-2 py-0.5 rounded text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-500/30">${esc(rNameMap.get(id) || ('Router #' + id))}</span>`).join('')}</div>`;
+    }
     return `<tr class="hover:bg-slate-800/40">
       <td class="px-4 py-2 font-mono font-medium text-sky-300">${esc(u.username)}${isMe ? ' <span class="text-[10px] text-slate-400 font-sans">(Anda)</span>' : ''}</td>
       <td class="px-4 py-2">${esc(u.name || '-')}</td>
       <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs font-bold uppercase ${isAdm ? 'bg-sky-500/20 text-sky-300' : 'bg-emerald-500/20 text-emerald-300'}">${esc(u.role)}</span></td>
-      <td class="px-4 py-2 text-xs text-slate-400 hidden sm:table-cell">${isAdm ? 'Akses penuh (Data Perusahaan, Akun, Router, POP)' : 'Tambah/Edit/Hapus POP & Router (Tanpa Data Perusahaan)'}</td>
+      <td class="px-4 py-2">${accessHtml}</td>
       <td class="px-4 py-2 text-right whitespace-nowrap">
         <div class="inline-flex gap-1 text-xs">
           <button data-u-act="edit" data-id="${u.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
@@ -1771,7 +1810,7 @@ async function loadUsers() {
   if (!currentUser || currentUser.role !== 'admin') return;
   try {
     const r = await fetch('/api/users');
-    if (r.ok) { usersList = await r.json(); renderUsers(); }
+    if (r.ok) { usersList = await r.json(); renderUsers(); renderUserRouterChecks(); }
   } catch (e) { console.error(e); }
 }
 
@@ -1782,6 +1821,8 @@ function resetUserForm() {
   $('uPass').required = true;
   $('uPass').placeholder = 'Min. 4 karakter';
   $('uCancelBtn').classList.add('hidden');
+  $('uRouterAccessBox').classList.remove('hidden');
+  renderUserRouterChecks([]);
   $('uFormMsg').textContent = '';
 }
 $('uCancelBtn').onclick = resetUserForm;
@@ -1791,11 +1832,13 @@ $('uForm').onsubmit = async (e) => {
   const id = $('uId').value;
   $('uFormMsg').textContent = 'Menyimpan…'; $('uFormMsg').className = 'text-xs text-slate-400';
   try {
+    const checkedRouters = [...$('uForm').querySelectorAll('input[name="uRouterId"]:checked')].map((el) => +el.value);
     const body = {
       username: $('uUsername').value.trim(),
       name: $('uName').value.trim(),
       role: $('uRole').value,
       password: $('uPass').value || undefined,
+      routerIds: $('uRole').value === 'admin' ? [] : checkedRouters,
     };
     const r = await fetch(id ? '/api/users/' + id : '/api/users', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
     const d = await r.json();
@@ -1825,6 +1868,8 @@ $('uBody').onclick = async (e) => {
     $('uPass').placeholder = 'Kosongkan jika tidak diubah';
     $('uFormTitle').textContent = 'Edit Akun: ' + u.username;
     $('uCancelBtn').classList.remove('hidden');
+    $('uRouterAccessBox').classList.toggle('hidden', u.role === 'admin');
+    renderUserRouterChecks(u.routerIds || []);
     $('uFormMsg').textContent = '';
     $('uUsername').focus();
   } else if (b.dataset.uAct === 'del' && confirm(`Hapus akun "${u.username}" (${u.role.toUpperCase()})?`)) {
@@ -1882,6 +1927,11 @@ async function loadRouters() {
   if (sig !== routerSig) {
     routerSig = sig;
     $('routerSel').innerHTML = routers.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('') || '<option value="">(belum ada router)</option>';
+    if (currentUser && currentUser.role === 'admin') {
+      const checked = [...document.querySelectorAll('input[name="uRouterId"]:checked')].map((el) => +el.value);
+      renderUserRouterChecks(checked);
+      renderUsers();
+    }
   }
   $('routerSel').value = rid || '';
   if (!$('mgr').classList.contains('hidden')) drawRouterList();
