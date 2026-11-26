@@ -65,6 +65,9 @@ if (!hasCol('users', 'router_ids')) {
 if (!hasCol('routers', 'tg_chat_id')) {
   db.exec("ALTER TABLE routers ADD COLUMN tg_chat_id TEXT NOT NULL DEFAULT ''");
 }
+if (!hasCol('routers', 'tg_bot_token')) {
+  db.exec("ALTER TABLE routers ADD COLUMN tg_bot_token TEXT NOT NULL DEFAULT ''");
+}
 if (legacy) {
   db.exec(`INSERT INTO samples SELECT 1, ts, online, offline, cpu, mem, rx, tx FROM samples_old;
     INSERT INTO if_samples SELECT 1, name, ts, rx, tx, up FROM if_samples_old;
@@ -125,8 +128,10 @@ function getTelegramSettings() {
     if (r.key in DEFAULT_TG_SETTINGS) out[r.key] = r.value;
   }
   const routerChats = {};
-  for (const r of db.prepare('SELECT id, tg_chat_id FROM routers').all()) {
+  const routerTokens = {};
+  for (const r of db.prepare('SELECT id, tg_chat_id, tg_bot_token FROM routers').all()) {
     routerChats[r.id] = r.tg_chat_id || '';
+    routerTokens[r.id] = r.tg_bot_token || '';
   }
   return {
     enabled: out.tgEnabled === '1',
@@ -139,6 +144,7 @@ function getTelegramSettings() {
     pppoeMinDown: Math.max(1, +out.tgPppoeMinDown || 1),
     routerDown: out.tgRouterDown !== '0',
     routerChats,
+    routerTokens,
   };
 }
 function setTelegramSettings(obj) {
@@ -158,6 +164,12 @@ function setTelegramSettings(obj) {
         upRChat.run(String(cid ?? '').trim().slice(0, 200), +rid);
       }
     }
+    if (obj.routerTokens && typeof obj.routerTokens === 'object') {
+      const upRTok = db.prepare('UPDATE routers SET tg_bot_token = ? WHERE id = ?');
+      for (const [rid, tok] of Object.entries(obj.routerTokens)) {
+        upRTok.run(String(tok ?? '').trim().slice(0, 200), +rid);
+      }
+    }
   });
   return getTelegramSettings();
 }
@@ -166,15 +178,20 @@ function setTelegramSettings(obj) {
 const listRouters = () => db.prepare('SELECT * FROM routers ORDER BY id').all();
 const getRouter = (id) => db.prepare('SELECT * FROM routers WHERE id = ?').get(id);
 function addRouter(r) {
-  const info = db.prepare('INSERT INTO routers (name, host, port, scheme, user, pass, insecure, enabled, tg_chat_id) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(r.name, r.host, r.port, r.scheme, r.user, r.pass, r.insecure ? 1 : 0, r.enabled === false ? 0 : 1, String(r.tg_chat_id || '').trim());
+  const info = db.prepare('INSERT INTO routers (name, host, port, scheme, user, pass, insecure, enabled, tg_chat_id, tg_bot_token) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(r.name, r.host, r.port, r.scheme, r.user, r.pass, r.insecure ? 1 : 0, r.enabled === false ? 0 : 1, String(r.tg_chat_id || '').trim(), String(r.tg_bot_token || '').trim());
   return getRouter(Number(info.lastInsertRowid));
 }
 function updateRouter(id, r) {
   const cur = getRouter(id); if (!cur) return null;
-  const m = { ...cur, ...r, pass: r.pass ? r.pass : cur.pass, tg_chat_id: r.tg_chat_id !== undefined ? String(r.tg_chat_id).trim() : (cur.tg_chat_id || '') };
-  db.prepare('UPDATE routers SET name=?, host=?, port=?, scheme=?, user=?, pass=?, insecure=?, enabled=?, tg_chat_id=? WHERE id=?')
-    .run(m.name, m.host, m.port, m.scheme, m.user, m.pass, m.insecure ? 1 : 0, m.enabled ? 1 : 0, m.tg_chat_id, id);
+  const m = {
+    ...cur, ...r,
+    pass: r.pass ? r.pass : cur.pass,
+    tg_chat_id: r.tg_chat_id !== undefined ? String(r.tg_chat_id).trim() : (cur.tg_chat_id || ''),
+    tg_bot_token: r.tg_bot_token !== undefined ? String(r.tg_bot_token).trim() : (cur.tg_bot_token || ''),
+  };
+  db.prepare('UPDATE routers SET name=?, host=?, port=?, scheme=?, user=?, pass=?, insecure=?, enabled=?, tg_chat_id=?, tg_bot_token=? WHERE id=?')
+    .run(m.name, m.host, m.port, m.scheme, m.user, m.pass, m.insecure ? 1 : 0, m.enabled ? 1 : 0, m.tg_chat_id, m.tg_bot_token, id);
   return getRouter(id);
 }
 function deleteRouter(id) {

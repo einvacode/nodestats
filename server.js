@@ -96,13 +96,17 @@ function tgPostOne(botToken, chatId, text) {
 async function sendTelegramMessage(text, overrideCfg = null, routerId = null) {
   const tg = overrideCfg ? { ...DB.getTelegramSettings(), ...overrideCfg } : DB.getTelegramSettings();
   if (!overrideCfg && !tg.enabled) return { ok: false, skipped: true };
-  const token = String(tg.botToken || '').trim();
-  const rChat = routerId ? String((tg.routerChats && tg.routerChats[routerId]) || DB.getRouter(routerId)?.tg_chat_id || '').trim() : '';
-  const targetChatStr = (overrideCfg && overrideCfg.chatId !== undefined)
-    ? String(overrideCfg.chatId || '').trim()
+  const rRow = routerId ? DB.getRouter(routerId) : null;
+  const rToken = routerId ? String((tg.routerTokens && tg.routerTokens[routerId]) || rRow?.tg_bot_token || '').trim() : '';
+  const rChat = routerId ? String((tg.routerChats && tg.routerChats[routerId]) || rRow?.tg_chat_id || '').trim() : '';
+  const token = (overrideCfg && overrideCfg.botToken !== undefined && String(overrideCfg.botToken).trim())
+    ? String(overrideCfg.botToken).trim()
+    : (rToken || String(tg.botToken || '').trim());
+  const targetChatStr = (overrideCfg && overrideCfg.chatId !== undefined && String(overrideCfg.chatId).trim())
+    ? String(overrideCfg.chatId).trim()
     : (rChat || String(tg.chatId || '').trim());
   const rawChats = targetChatStr.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
-  if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID (Utama atau Router) wajib diisi');
+  if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID (Default atau Khusus Router) wajib diisi');
   const results = [];
   for (let i = 0; i < rawChats.length; i++) {
     if (i > 0) await sleep(1200); // safe pacing across multiple chat IDs
@@ -567,7 +571,7 @@ DB.listRouters().forEach(startCollector);
 const publicRouter = (r) => {
   const c = collectors.get(r.id), s = c && r.enabled ? c.summary() : null;
   return { id: r.id, name: r.name, host: r.host, port: r.port, scheme: r.scheme, user: r.user, insecure: !!r.insecure, enabled: !!r.enabled, hasPass: !!r.pass,
-    tgChatId: r.tg_chat_id || '',
+    tgChatId: r.tg_chat_id || '', tgBotToken: r.tg_bot_token || '',
     status: s && { updated: s.updated, error: s.error, identity: s.identity, online: s.pppoe.online, offline: s.pppoe.offline, cpu: s.router.cpu } };
 };
 function cleanInput(b, partial) {
@@ -575,13 +579,14 @@ function cleanInput(b, partial) {
   const str = (k, max = 120) => { if (b[k] !== undefined) o[k] = String(b[k]).trim().slice(0, max); };
   ['name', 'host', 'user'].forEach((k) => str(k)); str('pass', 200);
   if (b.tgChatId !== undefined) o.tg_chat_id = String(b.tgChatId).trim().slice(0, 200);
+  if (b.tgBotToken !== undefined) o.tg_bot_token = String(b.tgBotToken).trim().slice(0, 200);
   if (b.scheme !== undefined) o.scheme = b.scheme === 'http' ? 'http' : 'https';
   if (b.port !== undefined) o.port = Math.min(65535, Math.max(1, +b.port || 443));
   if (b.insecure !== undefined) o.insecure = !!b.insecure;
   if (b.enabled !== undefined) o.enabled = !!b.enabled;
   if (!partial) {
     if (!o.name || !o.host) throw new Error('Nama dan host wajib diisi');
-    Object.assign(o, { port: o.port ?? 443, scheme: o.scheme ?? 'https', user: o.user || 'monitor', pass: o.pass || '', insecure: o.insecure ?? true, tg_chat_id: o.tg_chat_id || '' });
+    Object.assign(o, { port: o.port ?? 443, scheme: o.scheme ?? 'https', user: o.user || 'monitor', pass: o.pass || '', insecure: o.insecure ?? true, tg_chat_id: o.tg_chat_id || '', tg_bot_token: o.tg_bot_token || '' });
   }
   return o;
 }
@@ -703,9 +708,10 @@ http.createServer(async (req, res) => {
       const rid = +b.routerId || +q.get('router') || [...collectors.keys()][0];
       const c = collectors.get(rid);
       const rRow = rid ? DB.getRouter(rid) : null;
-      const customChat = b.chatId !== undefined ? String(b.chatId).trim() : (rRow?.tg_chat_id || saved.chatId);
+      const customToken = (b.botToken && String(b.botToken).trim()) || rRow?.tg_bot_token || saved.botToken;
+      const customChat = (b.chatId && String(b.chatId).trim()) || rRow?.tg_chat_id || saved.chatId;
       const cfg = {
-        botToken: b.botToken !== undefined ? b.botToken : saved.botToken,
+        botToken: customToken,
         chatId: customChat,
       };
       const brand = DB.getSettings().companyName || 'NodeStats';

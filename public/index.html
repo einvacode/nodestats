@@ -576,24 +576,24 @@ try {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="space-y-1">
-          <span class="text-xs text-slate-400">Bot Token (dari @BotFather) *</span>
+          <span class="text-xs text-slate-400">Bot Token Default / Utama (Opsional jika diisi per router)</span>
           <input id="tgBotToken" type="password" autocomplete="off" placeholder="mis. 123456789:ABCdefGHIjklMNOpqrSTUvwxYZ" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs sm:text-sm focus:outline-none focus:border-sky-500">
-          <span class="block text-[11px] text-slate-500">Buat bot di Telegram melalui <b>@BotFather</b> lalu salin token API-nya.</span>
+          <span class="block text-[11px] text-slate-500">Digunakan sebagai cadangan jika router tidak memiliki Bot Token sendiri.</span>
         </label>
         <label class="space-y-1">
-          <span class="text-xs text-slate-400">Chat ID / Group ID Default (Utama)</span>
+          <span class="text-xs text-slate-400">Chat ID / Group ID Default (Opsional jika diisi per router)</span>
           <input id="tgChatId" placeholder="mis. -1001234567890 atau 123456789" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs sm:text-sm focus:outline-none focus:border-sky-500">
-          <span class="block text-[11px] text-slate-500">Digunakan jika router tidak memiliki Chat ID khusus. Bisa diisi beberapa ID (pisahkan dengan koma).</span>
+          <span class="block text-[11px] text-slate-500">Digunakan sebagai cadangan jika router tidak memiliki Chat ID sendiri.</span>
         </label>
       </div>
 
-      <!-- Chat ID Khusus per Router -->
+      <!-- Bot Token & Chat ID Khusus per Router -->
       <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-4 space-y-3">
         <div class="flex items-center justify-between gap-2 flex-wrap">
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-sky-400">Chat ID / Group ID Telegram per Router</h4>
-          <span class="text-[11px] text-slate-500">Isi Chat ID berbeda untuk setiap router agar notifikasi terkirim ke grup/orang yang sesuai. Kosongkan jika ingin memakai Chat ID Default.</span>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-sky-400">Bot Token &amp; Chat ID Telegram Masing-Masing Router</h4>
+          <span class="text-[11px] text-slate-500">Setiap router bisa menggunakan <b>Bot Token</b> dan <b>Chat ID / Group ID</b> sendiri-sendiri. Kosongkan jika ingin ikut Default di atas.</span>
         </div>
-        <div id="tgRouterChatsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+        <div id="tgRouterChatsList" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
       </div>
 
       <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-4 space-y-3">
@@ -754,7 +754,8 @@ try {
           </div>
           <label class="space-y-1"><span class="text-xs text-slate-400">User API</span><input id="gUser" value="monitor" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
           <label class="space-y-1"><span class="text-xs text-slate-400">Password</span><input id="gPass" type="password" autocomplete="new-password" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5"></label>
-          <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">Chat ID Telegram Khusus Router Ini (Opsional)</span><input id="gTgChatId" placeholder="Kosongkan = pakai Chat ID Default (bisa lebih dari 1, pisahkan koma)" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 font-mono text-xs sm:text-sm"></label>
+          <label class="space-y-1"><span class="text-xs text-slate-400">Bot Token Telegram Router Ini (Opsional)</span><input id="gTgBotToken" type="password" autocomplete="off" placeholder="Kosong = pakai Bot Token Default" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 font-mono text-xs"></label>
+          <label class="space-y-1"><span class="text-xs text-slate-400">Chat ID Telegram Router Ini (Opsional)</span><input id="gTgChatId" placeholder="Kosong = pakai Chat ID Default" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 font-mono text-xs"></label>
         </div>
         <label class="flex items-center gap-2 text-sm text-slate-300"><input id="gInsecure" type="checkbox" checked> Terima sertifikat self-signed</label>
         <p id="gMsg" class="text-sm min-h-[1.25rem]"></p>
@@ -1567,14 +1568,16 @@ loadSettings();
 
 // ---- Telegram Notification Settings ----
 let tgRouterChatsCache = {};
+let tgRouterTokensCache = {};
 function updateTgBadge(en) {
   const b = $('tgStatusBadge');
   if (!b) return;
   b.textContent = en ? '● Aktif' : 'Nonaktif';
   b.className = 'px-2 py-0.5 rounded text-xs font-semibold ' + (en ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400');
 }
-function renderTgRouterChats(chatMap = tgRouterChatsCache) {
+function renderTgRouterChats(chatMap = tgRouterChatsCache, tokenMap = tgRouterTokensCache) {
   tgRouterChatsCache = { ...tgRouterChatsCache, ...(chatMap || {}) };
+  tgRouterTokensCache = { ...tgRouterTokensCache, ...(tokenMap || {}) };
   const box = $('tgRouterChatsList');
   if (!box) return;
   if (!routers.length) {
@@ -1582,13 +1585,23 @@ function renderTgRouterChats(chatMap = tgRouterChatsCache) {
     return;
   }
   box.innerHTML = routers.map((r) => {
-    const val = tgRouterChatsCache[r.id] !== undefined ? tgRouterChatsCache[r.id] : (r.tgChatId || '');
-    return `<div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-1.5">
+    const cVal = tgRouterChatsCache[r.id] !== undefined ? tgRouterChatsCache[r.id] : (r.tgChatId || '');
+    const tVal = tgRouterTokensCache[r.id] !== undefined ? tgRouterTokensCache[r.id] : (r.tgBotToken || '');
+    return `<div class="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs font-semibold text-slate-200 truncate">${esc(r.name)}</span>
-        <button type="button" data-tg-test-router="${r.id}" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-sky-400 shrink-0">Tes Router Ini</button>
+        <button type="button" data-tg-test-router="${r.id}" class="px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-medium text-sky-400 shrink-0">Tes Router Ini</button>
       </div>
-      <input data-tg-router-chat="${r.id}" value="${esc(val)}" placeholder="Chat ID khusus ${esc(r.name)} (kosong = pakai Default)" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-sky-500">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label class="space-y-0.5">
+          <span class="text-[11px] text-slate-400">Bot Token ${esc(r.name)}</span>
+          <input type="password" autocomplete="off" data-tg-router-token="${r.id}" value="${esc(tVal)}" placeholder="Bot Token khusus (kosong = Default)" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-sky-500">
+        </label>
+        <label class="space-y-0.5">
+          <span class="text-[11px] text-slate-400">Chat ID ${esc(r.name)}</span>
+          <input data-tg-router-chat="${r.id}" value="${esc(cVal)}" placeholder="Chat ID khusus (kosong = Default)" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-sky-500">
+        </label>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1603,7 +1616,8 @@ function fillTelegramForm(t) {
   $('tgRouterDown').checked = t.routerDown !== false;
   $('tgPppoeMinDown').value = t.pppoeMinDown || 1;
   if (t.routerChats) tgRouterChatsCache = { ...t.routerChats };
-  renderTgRouterChats(tgRouterChatsCache);
+  if (t.routerTokens) tgRouterTokensCache = { ...t.routerTokens };
+  renderTgRouterChats(tgRouterChatsCache, tgRouterTokensCache);
   updateTgBadge(!!t.enabled);
 }
 async function loadTelegramSettings() {
@@ -1617,9 +1631,12 @@ $('tgForm').onsubmit = async (e) => {
   e.preventDefault();
   $('tgMsg').textContent = 'Menyimpan…'; $('tgMsg').className = 'text-sm text-slate-400';
   try {
-    const routerChats = {};
+    const routerChats = {}, routerTokens = {};
     $('tgForm').querySelectorAll('input[data-tg-router-chat]').forEach((inp) => {
       routerChats[inp.dataset.tgRouterChat] = inp.value.trim();
+    });
+    $('tgForm').querySelectorAll('input[data-tg-router-token]').forEach((inp) => {
+      routerTokens[inp.dataset.tgRouterToken] = inp.value.trim();
     });
     const body = {
       enabled: $('tgEnabled').checked,
@@ -1632,6 +1649,7 @@ $('tgForm').onsubmit = async (e) => {
       routerDown: $('tgRouterDown').checked,
       pppoeMinDown: +$('tgPppoeMinDown').value || 1,
       routerChats,
+      routerTokens,
     };
     const r = await fetch('/api/telegram', { method: 'POST', body: JSON.stringify(body) });
     const d = await r.json();
@@ -1644,7 +1662,7 @@ $('tgForm').onsubmit = async (e) => {
     $('tgMsg').textContent = 'Gagal: ' + err.message; $('tgMsg').className = 'text-sm text-rose-400';
   }
 };
-async function testTelegramTarget(targetRid, customChatVal) {
+async function testTelegramTarget(targetRid, customTokenVal, customChatVal) {
   $('tgTestBtn').disabled = true;
   $('tgMsg').textContent = 'Mengirim pesan tes ke Telegram…'; $('tgMsg').className = 'text-sm text-slate-400';
   try {
@@ -1652,7 +1670,7 @@ async function testTelegramTarget(targetRid, customChatVal) {
       method: 'POST',
       body: JSON.stringify({
         routerId: targetRid || rid,
-        botToken: $('tgBotToken').value.trim(),
+        botToken: customTokenVal,
         chatId: customChatVal,
       }),
     });
@@ -1672,17 +1690,21 @@ async function testTelegramTarget(targetRid, customChatVal) {
   $('tgTestBtn').disabled = false;
 }
 $('tgTestBtn').onclick = () => {
-  const curInput = $('tgForm').querySelector(`input[data-tg-router-chat="${rid}"]`);
-  const chatToTest = (curInput && curInput.value.trim()) || $('tgChatId').value.trim();
-  testTelegramTarget(rid, chatToTest);
+  const curChatInp = $('tgForm').querySelector(`input[data-tg-router-chat="${rid}"]`);
+  const curTokInp = $('tgForm').querySelector(`input[data-tg-router-token="${rid}"]`);
+  const tokToTest = (curTokInp && curTokInp.value.trim()) || $('tgBotToken').value.trim();
+  const chatToTest = (curChatInp && curChatInp.value.trim()) || $('tgChatId').value.trim();
+  testTelegramTarget(rid, tokToTest, chatToTest);
 };
 $('tgRouterChatsList').onclick = (e) => {
   const b = e.target.closest('button[data-tg-test-router]');
   if (!b) return;
   const trid = +b.dataset.tgTestRouter;
-  const inp = $('tgForm').querySelector(`input[data-tg-router-chat="${trid}"]`);
-  const chatToTest = (inp && inp.value.trim()) || $('tgChatId').value.trim();
-  testTelegramTarget(trid, chatToTest);
+  const cInp = $('tgForm').querySelector(`input[data-tg-router-chat="${trid}"]`);
+  const tInp = $('tgForm').querySelector(`input[data-tg-router-token="${trid}"]`);
+  const tokToTest = (tInp && tInp.value.trim()) || $('tgBotToken').value.trim();
+  const chatToTest = (cInp && cInp.value.trim()) || $('tgChatId').value.trim();
+  testTelegramTarget(trid, tokToTest, chatToTest);
 };
 
 // ---- Auth & Role Management (Admin vs NOC) ----
@@ -1975,15 +1997,19 @@ document.addEventListener('click', (e) => { const b = e.target.closest('[data-us
 let routers = [], routerSig = '';
 async function loadRouters() {
   routers = await (await fetch('/api/routers')).json();
-  const sig = routers.map((r) => `${r.id}:${r.name}:${r.tgChatId || ''}`).join('|');
+  const sig = routers.map((r) => `${r.id}:${r.name}:${r.tgChatId || ''}:${r.tgBotToken ? '1' : '0'}`).join('|');
   if (!routers.some((r) => r.id === rid)) { rid = routers[0]?.id || 0; save({ router: rid }); }
   if (sig !== routerSig) {
     routerSig = sig;
     $('routerSel').innerHTML = routers.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('') || '<option value="">(belum ada router)</option>';
-    const curTgInputs = {};
-    document.querySelectorAll('input[data-tg-router-chat]').forEach((inp) => { curTgInputs[inp.dataset.tgRouterChat] = inp.value; });
-    routers.forEach((r) => { if (curTgInputs[r.id] === undefined) curTgInputs[r.id] = r.tgChatId || ''; });
-    renderTgRouterChats(curTgInputs);
+    const curTgChats = {}, curTgTokens = {};
+    document.querySelectorAll('input[data-tg-router-chat]').forEach((inp) => { curTgChats[inp.dataset.tgRouterChat] = inp.value; });
+    document.querySelectorAll('input[data-tg-router-token]').forEach((inp) => { curTgTokens[inp.dataset.tgRouterToken] = inp.value; });
+    routers.forEach((r) => {
+      if (curTgChats[r.id] === undefined) curTgChats[r.id] = r.tgChatId || '';
+      if (curTgTokens[r.id] === undefined) curTgTokens[r.id] = r.tgBotToken || '';
+    });
+    renderTgRouterChats(curTgChats, curTgTokens);
     if (currentUser && currentUser.role === 'admin') {
       const checked = [...document.querySelectorAll('input[name="uRouterId"]:checked')].map((el) => +el.value);
       renderUserRouterChecks(checked);
@@ -2025,10 +2051,10 @@ function drawRouterList() {
 }
 function resetForm() {
   $('gForm').reset(); $('gId').value = ''; $('gTitle').textContent = 'Tambah Router'; $('gReset').classList.add('hidden');
-  $('gPass').placeholder = ''; $('gPort').value = 443; $('gTgChatId').value = ''; gMsg('');
+  $('gPass').placeholder = ''; $('gPort').value = 443; $('gTgBotToken').value = ''; $('gTgChatId').value = ''; gMsg('');
 }
 const formBody = () => ({ name: $('gName').value, host: $('gHost').value, scheme: $('gScheme').value, port: +$('gPort').value || 443,
-  user: $('gUser').value, pass: $('gPass').value, insecure: $('gInsecure').checked, tgChatId: $('gTgChatId').value.trim() });
+  user: $('gUser').value, pass: $('gPass').value, insecure: $('gInsecure').checked, tgBotToken: $('gTgBotToken').value.trim(), tgChatId: $('gTgChatId').value.trim() });
 $('gList').onclick = async (e) => {
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const id = +b.dataset.id, r = routers.find((x) => x.id === id);
@@ -2036,6 +2062,7 @@ $('gList').onclick = async (e) => {
   if (b.dataset.act === 'edit') {
     $('gId').value = id; $('gName').value = r.name; $('gHost').value = r.host; $('gScheme').value = r.scheme; $('gPort').value = r.port;
     $('gUser').value = r.user; $('gPass').value = ''; $('gPass').placeholder = 'kosongkan = tidak diubah'; $('gInsecure').checked = r.insecure;
+    $('gTgBotToken').value = r.tgBotToken || '';
     $('gTgChatId').value = r.tgChatId || '';
     $('gTitle').textContent = 'Edit Router'; $('gReset').classList.remove('hidden'); gMsg(''); $('gName').focus();
   }
