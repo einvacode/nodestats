@@ -341,7 +341,7 @@ function history({ rid, from, to, iface }) {
   }
   return out;
 }
-function flaps({ rid, from, to, search, page, size }) {
+function flaps({ rid, from, to, search, sort, page, size }) {
   const w = 'router_id = ? AND ts BETWEEN ? AND ?' + (search ? ' AND name LIKE ?' : '');
   const args = search ? [rid, from, to, '%' + search + '%'] : [rid, from, to];
   const base = `SELECT name, SUM(event = 'down') downs,
@@ -349,7 +349,11 @@ function flaps({ rid, from, to, search, page, size }) {
     FROM events WHERE ${w} GROUP BY name HAVING downs > 0`;
   const total = db.prepare(`SELECT COUNT(*) c FROM (${base})`).get(...args).c;
   const sum = db.prepare(`SELECT COALESCE(SUM(downs),0) c FROM (${base})`).get(...args).c;
-  const rows = db.prepare(base + ' ORDER BY downs DESC, last_down DESC LIMIT ? OFFSET ?').all(...args, size, (page - 1) * size);
+  const order = sort === 'last_down' ? ' ORDER BY last_down DESC, downs DESC'
+    : sort === 'oldest_down' ? ' ORDER BY last_down ASC, downs DESC'
+    : sort === 'name' ? ' ORDER BY name COLLATE NOCASE ASC'
+    : ' ORDER BY downs DESC, last_down DESC';
+  const rows = db.prepare(base + order + ' LIMIT ? OFFSET ?').all(...args, size, (page - 1) * size);
   return { total, totalDowns: sum, rows: rows.map((r) => ({ name: r.name, downs: r.downs, lastDown: r.last_down * 1000, lastUp: r.last_up ? r.last_up * 1000 : null })) };
 }
 function userEvents({ rid, name, from, to }) {

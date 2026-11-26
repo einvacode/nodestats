@@ -202,6 +202,12 @@
         <select id="evSpan" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
           <option value="1">1 hari</option><option value="7">7 hari sampai tanggal ini</option><option value="30">30 hari sampai tanggal ini</option>
         </select>
+        <select id="evSort" aria-label="Urutkan riwayat" class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+          <option value="downs">Urut: Paling Sering Putus</option>
+          <option value="last_down">Urut: Terakhir Putus (Terbaru)</option>
+          <option value="oldest_down">Urut: Terakhir Putus (Terlama)</option>
+          <option value="name">Urut: Username (A–Z)</option>
+        </select>
         <input id="evSearch" placeholder="Cari username…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm flex-1 min-w-[10rem] focus:outline-none focus:border-sky-500">
       </div>
     </div>
@@ -817,10 +823,27 @@ $('pSearch').oninput = () => { clearTimeout(timer); timer = setTimeout(() => { p
 
 let evPage = 1, evTimer;
 $('evDate').max = new Date().toLocaleDateString('sv');
-$('evDate').value = ST.evDate || $('evDate').max; $('evSpan').value = ST.evSpan || '1'; $('evSearch').value = ST.evSearch || '';
+$('evDate').value = ST.evDate || $('evDate').max; $('evSpan').value = ST.evSpan || '1'; $('evSort').value = ST.evSort || 'downs'; $('evSearch').value = ST.evSearch || '';
 function drawEvHead() {
-  $('evHead').innerHTML = '<tr><th class="text-left px-4 py-2">Username</th><th class="text-right px-4 py-2">Putus</th><th class="text-left px-4 py-2">Terakhir putus</th><th class="text-left px-4 py-2 hidden sm:table-cell">Konek kembali</th><th class="text-left px-4 py-2">Status</th></tr>';
+  const s = $('evSort').value;
+  const thBtn = (key, label, align = 'text-left') => {
+    const active = s === key || (key === 'last_down' && s === 'oldest_down');
+    const arrow = s === key ? ' ▼' : (key === 'last_down' && s === 'oldest_down') ? ' ▲' : '';
+    return `<th class="${align} px-4 py-2"><button type="button" data-ev-sort="${key}" class="hover:text-slate-200 transition ${active ? 'text-sky-400 font-semibold' : ''}">${label}${arrow}</button></th>`;
+  };
+  $('evHead').innerHTML = `<tr>${thBtn('name', 'Username')}${thBtn('downs', 'Putus', 'text-right')}${thBtn('last_down', 'Terakhir putus')}<th class="text-left px-4 py-2 hidden sm:table-cell">Konek kembali</th><th class="text-left px-4 py-2">Status</th></tr>`;
 }
+$('evHead').onclick = (e) => {
+  const b = e.target.closest('[data-ev-sort]');
+  if (!b) return;
+  const k = b.dataset.evSort;
+  if (k === 'last_down') {
+    $('evSort').value = $('evSort').value === 'last_down' ? 'oldest_down' : 'last_down';
+  } else {
+    $('evSort').value = k;
+  }
+  evPage = 1; $('evScroll').scrollTop = 0; drawEvHead(); loadEvents();
+};
 const fmtDT = (ms) => new Date(ms).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const fmtDur = (ms) => { let s = Math.max(0, Math.round(ms / 1000)); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); s %= 60;
   return d ? `${d}h ${h}j` : h ? `${h}j ${m}m` : m ? `${m}m ${s}d` : `${s}d`; };
@@ -829,9 +852,10 @@ function evBounds() {
   return [e0 - span * 86400, e0];
 }
 async function loadEvents() {
-  const [from, to] = evBounds(), search = $('evSearch').value;
-  save({ evDate: $('evDate').value, evSpan: $('evSpan').value, evSearch: search });
-  const q = new URLSearchParams({ from, to, page: evPage, size: 50, search });
+  const [from, to] = evBounds(), search = $('evSearch').value, sort = $('evSort').value || 'downs';
+  save({ evDate: $('evDate').value, evSpan: $('evSpan').value, evSort: sort, evSearch: search });
+  drawEvHead();
+  const q = new URLSearchParams({ from, to, page: evPage, size: 50, search, sort });
   const d = await (await rq('/api/flaps?' + q)).json();
   if (!d.rows.length && evPage > 1) { evPage = 1; return loadEvents(); }
   $('evSum').innerHTML = `<span class="text-rose-300">Total putus: ${fmtN(d.totalDowns || 0)}×</span>`;
@@ -860,6 +884,7 @@ $('evPrev').onclick = () => { evPage--; $('evScroll').scrollTop = 0; loadEvents(
 $('evNext').onclick = () => { evPage++; $('evScroll').scrollTop = 0; loadEvents(); };
 $('evDate').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); };
 $('evSpan').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); };
+$('evSort').onchange = () => { evPage = 1; $('evScroll').scrollTop = 0; drawEvHead(); loadEvents(); };
 $('evSearch').oninput = () => { clearTimeout(evTimer); evTimer = setTimeout(() => { evPage = 1; $('evScroll').scrollTop = 0; loadEvents(); }, 300); };
 
 const MAIN_TABS = [['network', 'Network'], ['pengaturan', 'Pengaturan']];

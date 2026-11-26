@@ -810,7 +810,7 @@ http.createServer(async (req, res) => {
       }
       if (u.pathname === '/api/flaps') {
         const r = DB.flaps({ rid: c.id, from: +q.get('from') || now - 86400, to: +q.get('to') || now, search: q.get('search') || '',
-          page: Math.max(1, +q.get('page') || 1), size: Math.min(200, +q.get('size') || 50) });
+          sort: q.get('sort') || 'downs', page: Math.max(1, +q.get('page') || 1), size: Math.min(200, +q.get('size') || 50) });
         r.rows.forEach((x) => { x.online = c.prevActive ? c.prevActive.has(x.name) : null; });
         return send(res, 200, r);
       }
