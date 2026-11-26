@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
+<meta name="color-scheme" content="light dark">
+<meta id="metaThemeColor" name="theme-color" content="#09090b">
+<script>
+try {
+  const _st = JSON.parse(localStorage.getItem('nodestats') || '{}');
+  const _th = localStorage.getItem('color-scheme') || _st.theme || 'dark';
+  const _isLight = _th === 'light' || (_th === 'light dark' && window.matchMedia('(prefers-color-scheme: light)').matches);
+  document.querySelector('meta[name="color-scheme"]').content = _isLight ? 'light' : 'dark';
+  document.documentElement.classList.toggle('dark', !_isLight);
+  document.documentElement.classList.toggle('light', _isLight);
+  document.getElementById('metaThemeColor').content = _isLight ? '#f4f4f5' : '#09090b';
+} catch {}
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>NodeStats – MikroTik Monitor</title>
@@ -14,7 +26,30 @@
 <script>tailwind.config = { darkMode: 'class' }</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
-  html, body { max-width: 100%; overflow-x: clip; overflow-wrap: break-word; -webkit-text-size-adjust: 100%; }
+  :root {
+    color-scheme: light dark;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    --sb-thumb: #3f3f46;
+    --sb-track: #09090b;
+  }
+  :root:has(> head > meta[name="color-scheme"][content="dark"]), html.dark {
+    color-scheme: dark;
+    --sb-thumb: #3f3f46;
+    --sb-track: #09090b;
+  }
+  :root:has(> head > meta[name="color-scheme"][content="light"]), html.light {
+    color-scheme: light;
+    --sb-thumb: #d4d4d8;
+    --sb-track: #f4f4f5;
+  }
+  html, body {
+    max-width: 100%;
+    overflow-x: clip;
+    overflow-wrap: break-word;
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--sb-thumb) var(--sb-track);
+  }
   #topHeader {
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: env(safe-area-inset-left, 0px);
@@ -38,6 +73,53 @@
       height: clamp(13.5rem, 17.5vh, 26rem);
     }
   }
+
+  /* Clean Industrial Dark Mode (Neutral Zinc/Carbon instead of heavy blue-tinted slate) */
+  html.dark body.bg-slate-950 { background-color: #09090b !important; color: #e4e4e7 !important; }
+  html.dark .bg-slate-900 { background-color: #121215 !important; }
+  html.dark .bg-slate-950, html.dark .bg-slate-950\/50, html.dark .bg-slate-950\/60, html.dark .bg-slate-950\/70 { background-color: #0c0c0e !important; }
+  html.dark .bg-slate-800 { background-color: #1c1c21 !important; }
+  html.dark .bg-slate-800\/60, html.dark .bg-slate-800\/50, html.dark .bg-slate-800\/40 { background-color: rgba(28, 28, 33, 0.7) !important; }
+  html.dark .border-slate-800, html.dark .border-slate-800\/60, html.dark .border-slate-900 { border-color: #232329 !important; }
+  html.dark .border-slate-700 { border-color: #2e2e36 !important; }
+  html.dark .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #1f1f24 !important; }
+
+  /* Clean Crisp Light Mode (Neutral Daylight Paper & High-Contrast Ink) */
+  html.light body.bg-slate-950 { background-color: #f4f4f5 !important; color: #18181b !important; }
+  html.light #topHeader { background-color: #ffffff !important; border-color: #e4e4e7 !important; }
+  html.light .bg-slate-900 { background-color: #ffffff !important; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03); }
+  html.light .bg-slate-950, html.light .bg-slate-950\/50, html.light .bg-slate-950\/60, html.light .bg-slate-950\/70 { background-color: #f8fafc !important; }
+  html.light .bg-slate-950\/95 { background-color: rgba(244, 244, 245, 0.94) !important; }
+  html.light .bg-slate-800 { background-color: #f1f5f9 !important; color: #0f172a !important; }
+  html.light .bg-slate-800\/60, html.light .bg-slate-800\/50 { background-color: #f1f5f9 !important; }
+  html.light .hover\:bg-slate-700:hover { background-color: #e2e8f0 !important; }
+  html.light .hover\:bg-slate-800\/60:hover, html.light .hover\:bg-slate-800\/40:hover { background-color: #f8fafc !important; }
+  html.light .border-slate-800, html.light .border-slate-800\/60, html.light .border-slate-900 { border-color: #e4e4e7 !important; }
+  html.light .border-slate-700 { border-color: #cbd5e1 !important; }
+  html.light .hover\:border-slate-700:hover { border-color: #94a3b8 !important; }
+  html.light .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e4e4e7 !important; }
+  html.light .text-slate-200 { color: #0f172a !important; }
+  html.light .text-slate-300 { color: #1e293b !important; }
+  html.light .text-slate-400 { color: #475569 !important; }
+  html.light .text-slate-500 { color: #64748b !important; }
+  html.light .hover\:text-slate-200:hover, html.light .hover\:text-white:hover { color: #0f172a !important; }
+  html.light .ring-slate-900 { --tw-ring-color: #ffffff !important; }
+
+  /* Semantic Status Badges & Accents in Light Mode (Sharp contrast, not washed-out pastel) */
+  html.light .text-sky-400, html.light .text-sky-300 { color: #0284c7 !important; }
+  html.light .text-emerald-400, html.light .text-emerald-300 { color: #059669 !important; }
+  html.light .text-rose-400, html.light .text-rose-300, html.light .text-rose-200 { color: #e11d48 !important; }
+  html.light .text-amber-400, html.light .text-amber-300 { color: #d97706 !important; }
+  html.light .bg-emerald-500\/20, html.light .bg-emerald-600\/20 { background-color: #ecfdf5 !important; border-color: #a7f3d0 !important; }
+  html.light .bg-rose-500\/20, html.light .bg-rose-500\/30 { background-color: #fff1f2 !important; border-color: #fecdd3 !important; }
+  html.light .bg-sky-500\/20, html.light .bg-sky-600\/20 { background-color: #f0f9ff !important; border-color: #bae6fd !important; }
+  html.light .bg-amber-500\/20, html.light .bg-amber-500\/15 { background-color: #fffbeb !important; border-color: #fde68a !important; }
+  html.light .bg-rose-950\/30, html.light .bg-rose-950\/20 { background-color: #fff1f2 !important; }
+  html.light #popAlarmBanner { background-color: #fff1f2 !important; border-color: #f43f5e !important; color: #881337 !important; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.08) !important; }
+  html.light #popAlarmBanner .text-rose-200, html.light #popAlarmBanner .text-rose-200\/90 { color: #9f1239 !important; }
+  html.light #popAlarmBanner .bg-rose-900\/80 { background-color: #ffe4e6 !important; border-color: #fda4af !important; color: #881337 !important; }
+  html.light #popAlarmBanner .bg-rose-800\/80 { background-color: #fecdd3 !important; color: #881337 !important; border-color: #fb7185 !important; }
+  html.light [class*="color-scheme:dark"] { color-scheme: light !important; }
 </style>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col w-full">
@@ -55,11 +137,20 @@
     </div>
     <div class="flex items-center gap-1 shrink-0 ml-auto">
       <select id="routerSel" aria-label="Pilih Router" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 sm:py-1.5 text-xs sm:text-sm max-w-[6.25rem] sm:max-w-[11rem] md:max-w-xs truncate focus:outline-none focus:border-sky-500"></select>
-      <button id="pwaInstallBtn" title="Install Aplikasi (PWA)" aria-label="Install Aplikasi" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 text-xs font-medium shrink-0">📲<span class="hidden sm:inline ml-1">Install</span></button>
-      <button id="updBtn" title="Update aplikasi" aria-label="Update aplikasi" class="relative h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-xs sm:text-sm shrink-0">⬆<span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span></button>
-      <button id="mgrBtn" title="Kelola router" aria-label="Kelola router" class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-xs sm:text-sm shrink-0">⚙</button>
+      <button id="pwaInstallBtn" title="Install Aplikasi (PWA)" aria-label="Install Aplikasi" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 text-xs font-medium shrink-0">Install</button>
+      <button id="themeBtn" type="button" title="Ganti Tema Terang / Gelap" aria-label="Ganti Tema Terang atau Gelap" class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
+        <svg id="iconSun" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="iconMoon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <button id="updBtn" title="Update aplikasi" aria-label="Update aplikasi" class="relative h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span>
+      </button>
+      <button id="mgrBtn" title="Kelola router" aria-label="Kelola router" class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
       <span id="userBadge" class="hidden"></span>
-      <button id="logoutBtn" title="Keluar / Logout" aria-label="Keluar" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-rose-950/60 hover:border-rose-500/40 hover:text-rose-300 text-xs font-medium shrink-0">⎋<span class="hidden sm:inline ml-1">Keluar</span></button>
+      <button id="logoutBtn" title="Keluar / Logout" aria-label="Keluar" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-rose-950/60 hover:border-rose-500/40 hover:text-rose-300 text-xs font-medium shrink-0">Keluar</button>
     </div>
   </div>
   <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
@@ -96,26 +187,26 @@
   </div>
 
   <!-- KPI cards -->
-  <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-3.5">
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl font-bold text-emerald-400">-</p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl font-bold text-rose-400">-</p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5"><p class="text-xs text-slate-500">Total Aktif (secret)</p><p id="kEnabled" class="text-2xl font-bold">-</p><p id="kDisabled" class="text-xs text-slate-500"></p></div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
-      <p class="text-xs text-slate-500">Rasio PPPoE</p><p id="kPct" class="text-2xl font-bold text-sky-400">-</p>
+  <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5">-</p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5">-</p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Total Secret</p><p id="kEnabled" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kDisabled" class="text-xs text-slate-500 tabular-nums"></p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Rasio PPPoE</p><p id="kPct" class="text-2xl font-semibold tabular-nums tracking-tight text-sky-400 mt-0.5">-</p>
       <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
     </div>
-    <div id="kPopCard" class="rounded-xl bg-slate-900 border border-slate-800 p-3.5 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
-      <p class="text-xs text-slate-500">Jumlah POP</p><p id="kPopTotal" class="text-2xl font-bold">-</p><p id="kPopSub" class="text-xs text-slate-500">0 aktif</p>
+    <div id="kPopCard" class="rounded-lg bg-slate-900 border border-slate-800 p-3 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Jumlah POP</p><p id="kPopTotal" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kPopSub" class="text-xs text-slate-500 tabular-nums">0 aktif</p>
     </div>
-    <div id="kPopPctCard" class="rounded-xl bg-slate-900 border border-slate-800 p-3.5 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
-      <p class="text-xs text-slate-500">Rasio POP Online</p><p id="kPopPct" class="text-2xl font-bold text-emerald-400">-</p>
+    <div id="kPopPctCard" class="rounded-lg bg-slate-900 border border-slate-800 p-3 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Rasio POP</p><p id="kPopPct" class="text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5">-</p>
       <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPopPctBar" class="h-1.5 rounded bg-emerald-500 transition-all" style="width:0"></div></div>
     </div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
-      <p class="text-xs text-slate-500">CPU</p><p id="kCpu" class="text-2xl font-bold">-</p><p id="kCpuSub" class="text-xs text-slate-500"></p>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">CPU Load</p><p id="kCpu" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kCpuSub" class="text-xs text-slate-500 tabular-nums"></p>
     </div>
-    <div class="rounded-xl bg-slate-900 border border-slate-800 p-3.5">
-      <p class="text-xs text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl font-bold">-</p><p id="kTemp" class="text-xs text-slate-500"></p>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kTemp" class="text-xs text-slate-500 tabular-nums"></p>
     </div>
   </section>
 
@@ -269,9 +360,9 @@
             <p class="text-xs text-slate-500">Pantau status IP POP / OLT / Radio secara otomatis. Alarm berbunyi jika ada POP yang DOWN.</p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <button id="popSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium">🔊 Alarm Bunyi: ON</button>
-            <button id="popTestSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">🔔 Tes Bunyi</button>
-            <button id="popCheckBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">↻ Cek Sekarang</button>
+            <button id="popSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium">Suara Alarm: ON</button>
+            <button id="popTestSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Tes Suara</button>
+            <button id="popCheckBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Cek Sekarang</button>
             <button id="popToggleFormBtn" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium">+ Tambah POP</button>
           </div>
         </div>
@@ -418,14 +509,22 @@
 
     <div class="space-y-4">
       <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-3">
-        <h3 class="text-base font-semibold">Manajemen Sistem</h3>
-        <p class="text-xs text-slate-400">Kelola daftar perangkat MikroTik yang dipantau dan pembaruan aplikasi.</p>
+        <h3 class="text-base font-semibold">Manajemen Sistem &amp; Tampilan</h3>
+        <p class="text-xs text-slate-400">Kelola perangkat MikroTik, tema tampilan dashboard, dan pembaruan aplikasi.</p>
         <div class="space-y-2 pt-1">
-          <button type="button" id="sOpenMgr" class="w-full px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-left flex items-center justify-between">
-            <span>⚙ Kelola Router MikroTik</span><span class="text-xs text-slate-400">Tambah / Edit ›</span>
+          <div class="px-3.5 py-2.5 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-between gap-2">
+            <span class="text-sm font-medium">Tema Tampilan</span>
+            <div id="themeSeg" class="inline-flex rounded-md bg-slate-950 p-0.5 border border-slate-800 text-xs font-medium">
+              <button type="button" data-theme-pick="light" class="px-2.5 py-1 rounded">Terang</button>
+              <button type="button" data-theme-pick="dark" class="px-2.5 py-1 rounded">Gelap</button>
+              <button type="button" data-theme-pick="system" class="px-2.5 py-1 rounded">Sistem</button>
+            </div>
+          </div>
+          <button type="button" id="sOpenMgr" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-sm text-left flex items-center justify-between">
+            <span class="font-medium">Kelola Router MikroTik</span><span class="text-xs text-slate-400">Tambah / Edit ›</span>
           </button>
-          <button type="button" id="sOpenUpd" class="w-full px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-left flex items-center justify-between">
-            <span>⬆ Update Aplikasi (GitHub)</span><span class="text-xs text-slate-400">Cek Versi ›</span>
+          <button type="button" id="sOpenUpd" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-sm text-left flex items-center justify-between">
+            <span class="font-medium">Update Aplikasi (GitHub)</span><span class="text-xs text-slate-400">Cek Versi ›</span>
           </button>
         </div>
       </div>
@@ -485,35 +584,35 @@
           <label class="flex items-start gap-2.5 cursor-pointer">
             <input id="tgPopDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
             <div>
-              <div class="font-medium text-slate-200">🚨 POP Down (Putus)</div>
-              <div class="text-xs text-slate-500">Jumlah &amp; daftar nama POP, IP, lokasi yang tidak merespons ping</div>
+              <div class="font-medium text-slate-200">POP Down (Putus)</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; daftar nama POP yang tidak merespons ping</div>
             </div>
           </label>
           <label class="flex items-start gap-2.5 cursor-pointer">
             <input id="tgPopUp" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
             <div>
-              <div class="font-medium text-slate-200">✅ POP Up (Kembali Online)</div>
-              <div class="text-xs text-slate-500">Notifikasi saat POP kembali menyala beserta durasi putusnya</div>
+              <div class="font-medium text-slate-200">POP Up (Kembali Online)</div>
+              <div class="text-xs text-slate-500">Notifikasi saat POP kembali terkoneksi</div>
             </div>
           </label>
           <label class="flex items-start gap-2.5 cursor-pointer">
             <input id="tgPppoeDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
             <div>
-              <div class="font-medium text-slate-200">🔻 Pelanggan PPPoE Down</div>
-              <div class="text-xs text-slate-500">Jumlah &amp; rincian username, paket/profile, IP, dan uptime user yang putus</div>
+              <div class="font-medium text-slate-200">Pelanggan PPPoE Down</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; daftar username PPPoE yang tidak terkoneksi</div>
             </div>
           </label>
           <label class="flex items-start gap-2.5 cursor-pointer">
             <input id="tgPppoeUp" type="checkbox" class="mt-0.5 h-4 w-4 rounded accent-sky-500">
             <div>
-              <div class="font-medium text-slate-200">🟢 Pelanggan PPPoE Konek Kembali</div>
-              <div class="text-xs text-slate-500">Jumlah &amp; rincian username PPPoE yang baru terhubung kembali</div>
+              <div class="font-medium text-slate-200">Pelanggan PPPoE Konek Kembali</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; daftar username PPPoE yang baru terhubung kembali</div>
             </div>
           </label>
           <label class="flex items-start gap-2.5 cursor-pointer">
             <input id="tgRouterDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
             <div>
-              <div class="font-medium text-slate-200">🖥 Router MikroTik Terputus / Pulih</div>
+              <div class="font-medium text-slate-200">Router MikroTik Terputus / Pulih</div>
               <div class="text-xs text-slate-500">Notifikasi jika koneksi API ke router MikroTik gagal / kembali normal</div>
             </div>
           </label>
@@ -529,8 +628,8 @@
       </div>
 
       <div class="flex items-center gap-2.5 flex-wrap pt-1">
-        <button type="submit" id="tgSaveBtn" class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Simpan Pengaturan Telegram</button>
-        <button type="button" id="tgTestBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">📨 Tes Kirim Pesan</button>
+        <button type="submit" id="tgSaveBtn" class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium">Simpan Pengaturan Telegram</button>
+        <button type="button" id="tgTestBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">Tes Kirim Pesan</button>
         <span id="tgMsg" class="text-sm"></span>
       </div>
     </form>
@@ -690,17 +789,19 @@ const fmtBps = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' Gbps' : b >= 1e6 ? (b 
 const fmtN = (n) => Number(n).toLocaleString('id-ID');
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.color = '#71717a'; Chart.defaults.borderColor = '#232329';
 const mk = (id, datasets, yFmt) => new Chart($(id), {
-  type: 'line', data: { labels: [], datasets: datasets.map(([label, color]) => ({ label, borderColor: color, backgroundColor: color + '22', fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, data: [] })) },
+  type: 'line', data: { labels: [], datasets: datasets.map(([label, color]) => ({ label, borderColor: color, backgroundColor: color + '1a', fill: true, tension: .25, pointRadius: 0, borderWidth: 1.5, data: [] })) },
   options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
-    scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: true, ticks: { callback: yFmt || ((v) => v) } } }, plugins: { legend: { labels: { boxWidth: 10 } } } },
+    scales: { x: { grid: { color: () => document.documentElement.classList.contains('light') ? '#e4e4e7' : '#1f1f24' }, ticks: { maxTicksLimit: 6 } },
+      y: { beginAtZero: true, grid: { color: () => document.documentElement.classList.contains('light') ? '#e4e4e7' : '#1f1f24' }, ticks: { callback: yFmt || ((v) => v) } } },
+    plugins: { legend: { labels: { boxWidth: 10 } } } },
 });
 const mbps = (v) => (v / 1e6).toFixed(0);
-const cTraffic = mk('cTraffic', [['Rx', '#38bdf8'], ['Tx', '#34d399']], mbps);
-const cOnline = mk('cOnline', [['Online', '#34d399'], ['Offline', '#fb7185']]);
+const cTraffic = mk('cTraffic', [['Rx', '#0284c7'], ['Tx', '#10b981']], mbps);
+const cOnline = mk('cOnline', [['Online', '#10b981'], ['Offline', '#f43f5e']]);
 const cCpu = mk('cCpu', [['CPU %', '#f59e0b']]); cCpu.options.scales.y.max = 100;
-const cIf = mk('cIf', [['Rx', '#38bdf8'], ['Tx', '#34d399']], mbps);
+const cIf = mk('cIf', [['Rx', '#0284c7'], ['Tx', '#10b981']], mbps);
 
 function setChart(c, labels, ...series) {
   c.data.labels = labels; series.forEach((s, i) => (c.data.datasets[i].data = s)); c.update();
@@ -721,6 +822,71 @@ window.fetch = async (u, o = {}) => {
 let rid = +ST.router || 0;
 const rq = (u, o) => fetch(u + (u.includes('?') ? '&' : '?') + 'router=' + rid, o);
 const save = (o) => { Object.assign(ST, o); localStorage.setItem('nodestats', JSON.stringify(ST)); };
+
+// ---- Clean Light / Dark Theme Switcher ----
+const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
+function resolveTheme(pref) {
+  if (pref === 'light' || pref === 'dark') return pref;
+  return sysDarkMQ.matches ? 'dark' : 'light';
+}
+function applyTheme(pref) {
+  const mode = pref || localStorage.getItem('color-scheme') || ST.theme || 'dark';
+  const resolved = resolveTheme(mode);
+  const isLight = resolved === 'light';
+  const metaCS = document.querySelector('meta[name="color-scheme"]');
+  if (metaCS) metaCS.content = isLight ? 'light' : 'dark';
+  const metaTC = $('metaThemeColor');
+  if (metaTC) metaTC.content = isLight ? '#f4f4f5' : '#09090b';
+  document.documentElement.classList.toggle('dark', !isLight);
+  document.documentElement.classList.toggle('light', isLight);
+
+  if ($('iconSun')) $('iconSun').classList.toggle('hidden', isLight);
+  if ($('iconMoon')) $('iconMoon').classList.toggle('hidden', !isLight);
+  if ($('themeBtn')) $('themeBtn').title = isLight ? 'Ganti ke Tema Gelap' : 'Ganti ke Tema Terang';
+
+  if ($('themeSeg')) {
+    const activePick = (mode === 'light' || mode === 'dark') ? mode : 'system';
+    $('themeSeg').querySelectorAll('[data-theme-pick]').forEach((b) => {
+      const on = b.dataset.themePick === activePick;
+      b.className = 'px-2.5 py-1 rounded transition ' + (on ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-slate-200');
+    });
+  }
+
+  Chart.defaults.color = isLight ? '#52525b' : '#a1a1aa';
+  Chart.defaults.borderColor = isLight ? '#e4e4e7' : '#232329';
+  [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.update('none'));
+}
+function setThemePref(next) {
+  if (next === 'system') {
+    localStorage.removeItem('color-scheme');
+    save({ theme: 'system' });
+    applyTheme('system');
+  } else {
+    localStorage.setItem('color-scheme', next);
+    save({ theme: next });
+    applyTheme(next);
+  }
+}
+if ($('themeBtn')) {
+  $('themeBtn').onclick = () => {
+    const cur = document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    setThemePref(cur === 'light' ? 'dark' : 'light');
+  };
+}
+if ($('themeSeg')) {
+  $('themeSeg').onclick = (e) => {
+    const b = e.target.closest('[data-theme-pick]');
+    if (b) setThemePref(b.dataset.themePick);
+  };
+}
+sysDarkMQ.addEventListener('change', () => {
+  const mode = localStorage.getItem('color-scheme') || ST.theme || 'dark';
+  if (mode === 'system') applyTheme('system');
+});
+window.addEventListener('storage', (e) => {
+  if (e.key === 'color-scheme') applyTheme(e.newValue || 'system');
+});
+applyTheme();
 let hist = null, ifaces = [];
 const RANGES = [['live', 'Live'], ['6h', '6 jam'], ['24h', '24 jam'], ['7d', '7 hari'], ['30d', '30 hari']];
 let range = ST.range || 'live', dayStr = ST.dayStr || '';
@@ -994,7 +1160,7 @@ function playAlarmBeep() {
 }
 
 function updateSoundBtn() {
-  $('popSoundBtn').textContent = popSoundOn ? '🔊 Alarm Bunyi: ON' : '🔇 Alarm Bunyi: OFF';
+  $('popSoundBtn').textContent = popSoundOn ? 'Suara Alarm: ON' : 'Suara Alarm: OFF';
   $('popSoundBtn').className = 'px-3 py-1.5 rounded-lg text-xs font-medium border ' + (popSoundOn
     ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
     : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700');
@@ -1207,14 +1373,14 @@ $('popSearch').oninput = () => { $('popScroll').scrollTop = 0; renderPops(); };
 
 $('popCheckBtn').onclick = async () => {
   $('popCheckBtn').disabled = true;
-  $('popCheckBtn').textContent = '↻ Mengecek…';
+  $('popCheckBtn').textContent = 'Mengecek…';
   try {
     const d = await (await rq('/api/pops/check', { method: 'POST' })).json();
     if (d.pops) updatePopState(d.pops);
     if (d.events) { popEvents = d.events; renderPopEvents(); }
   } catch (e) { console.error(e); }
   $('popCheckBtn').disabled = false;
-  $('popCheckBtn').textContent = '↻ Cek Sekarang';
+  $('popCheckBtn').textContent = 'Cek Sekarang';
 };
 
 $('popForm').onsubmit = async (e) => {
