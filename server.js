@@ -245,7 +245,6 @@ class Collector {
     const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
     const allPops = this.popsList().filter((x) => x.enabled);
     const curDowns = allPops.filter((x) => x.status === 'down');
-    const curUps = allPops.filter((x) => x.status === 'up');
 
     const downChanges = changes.filter((c) => c.status === 'down');
     const upChanges = changes.filter((c) => c.status === 'up');
@@ -257,14 +256,14 @@ class Collector {
         return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${loc}${note}`;
       });
       const otherDowns = curDowns.filter((d) => !downChanges.some((c) => c.pop.id === d.id));
-      let msg = `🚨 <b>ALARM POP DOWN (${downChanges.length} POP)</b>\n`
+      let msg = `🚨 <b>POP TIDAK KONEK / DOWN (${downChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
-        + `📊 Status POP: <b>${curUps.length} UP</b> / <b>${curDowns.length} DOWN</b> (dari ${allPops.length} POP)\n\n`
+        + `⚠️ Total POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
         + `<b>Daftar POP Baru Down (${downChanges.length}):</b>\n`
         + lines.join('\n');
       if (otherDowns.length) {
-        msg += `\n\n<b>POP Lain yang Masih Down (${otherDowns.length}):</b>\n`
-          + otherDowns.slice(0, 20).map((d) => `• ${escTg(d.name)} (<code>${escTg(d.ip)}</code>)${d.downSince ? ` – down ${fmtDurTg(Date.now() - d.downSince)}` : ''}`).join('\n');
+        msg += `\n\n<b>POP Lain yang Masih Tidak Konek (${otherDowns.length}):</b>\n`
+          + otherDowns.slice(0, 20).map((d) => `• <b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)${d.downSince ? ` – down ${fmtDurTg(Date.now() - d.downSince)}` : ''}`).join('\n');
         if (otherDowns.length > 20) msg += `\n<i>...dan ${otherDowns.length - 20} POP lainnya</i>`;
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
@@ -278,14 +277,14 @@ class Collector {
         const loc = c.pop.location ? ` · 📍 ${escTg(c.pop.location)}` : '';
         return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${rtt}${dur}${loc}`;
       });
-      let msg = `✅ <b>POP UP / PULIH (${upChanges.length} POP)</b>\n`
+      let msg = `✅ <b>POP KEMBALI KONEK (${upChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
-        + `📊 Status POP: <b>${curUps.length} UP</b> / <b>${curDowns.length} DOWN</b> (dari ${allPops.length} POP)\n\n`
-        + `<b>Daftar POP Kembali Online (${upChanges.length}):</b>\n`
+        + `⚠️ Sisa POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
+        + `<b>Daftar POP Kembali Konek (${upChanges.length}):</b>\n`
         + lines.join('\n');
       if (curDowns.length) {
-        msg += `\n\n⚠️ <b>Masih Ada ${curDowns.length} POP Down:</b>\n`
-          + curDowns.slice(0, 15).map((d) => `• ${escTg(d.name)} (<code>${escTg(d.ip)}</code>)`).join('\n');
+        msg += `\n\n<b>POP yang Masih Tidak Konek (${curDowns.length}):</b>\n`
+          + curDowns.slice(0, 15).map((d) => `• <b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join('\n');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -386,7 +385,7 @@ class Collector {
         if (tg.enabled && tg.routerDown) {
           const brand = DB.getSettings().companyName || 'NodeStats';
           const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
-          queueTelegram(`✅ <b>ROUTER TERHUBUNG KEMBALI</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n📊 PPPoE Online: <b>${sm.pppoe.online}</b> · Offline: <b>${sm.pppoe.offline}</b>\n🕒 Waktu: ${fmtTimeTg(now)}`);
+          queueTelegram(`✅ <b>ROUTER TERHUBUNG KEMBALI</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n⚠️ PPPoE Tidak Konek: <b>${sm.pppoe.offline} User</b>\n🕒 Waktu: ${fmtTimeTg(now)}`);
         }
       } else {
         this.failCount = 0;
@@ -416,9 +415,13 @@ class Collector {
     const brand = DB.getSettings().companyName || 'NodeStats';
     const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
     const secMap = new Map(this.secrets.map((s) => [s.name, s]));
+    const activeSet = new Set(this.active.map((a) => a.name));
+    const allOffline = this.secrets.filter((s) => s.disabled !== 'true' && !activeSet.has(s.name));
     const MAX_LIST = 45;
 
     if (downUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeDown) {
+      const downSet = new Set(downUsers.map((u) => u.name));
+      const otherOffline = allOffline.filter((s) => !downSet.has(s.name));
       const shown = downUsers.slice(0, MAX_LIST).map((u, idx) => {
         const sec = secMap.get(u.name);
         const prof = sec?.profile ? ` [${escTg(sec.profile)}]` : '';
@@ -426,13 +429,20 @@ class Collector {
         const up = u.uptime ? ` · Uptime: ${escTg(u.uptime)}` : '';
         return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}${up}`;
       });
-      let msg = `🔻 <b>PPPoE USER DOWN (${downUsers.length} User Putus)</b>\n`
+      let msg = `🔻 <b>PPPoE TIDAK KONEK / PUTUS (${downUsers.length} User)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
-        + `📊 Status PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n\n`
-        + `<b>Detail User Putus (${downUsers.length}):</b>\n`
+        + `⚠️ Total PPPoE Tidak Konek: <b>${allOffline.length} User</b>\n\n`
+        + `<b>User Baru Putus (${downUsers.length}):</b>\n`
         + shown.join('\n');
       if (downUsers.length > MAX_LIST) {
         msg += `\n<i>...dan ${downUsers.length - MAX_LIST} user lainnya</i>`;
+      }
+      if (otherOffline.length) {
+        msg += `\n\n<b>User Lain yang Masih Tidak Konek (${otherOffline.length}):</b>\n`
+          + otherOffline.slice(0, 25).map((s) => `• <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
+        if (otherOffline.length > 25) {
+          msg += `\n<i>...dan ${otherOffline.length - 25} user lainnya</i>`;
+        }
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -445,13 +455,20 @@ class Collector {
         const ip = u.address ? ` · IP: <code>${escTg(u.address)}</code>` : '';
         return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}`;
       });
-      let msg = `🟢 <b>PPPoE USER UP (${upUsers.length} User Konek)</b>\n`
+      let msg = `🟢 <b>PPPoE KEMBALI KONEK (${upUsers.length} User)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
-        + `📊 Status PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n\n`
-        + `<b>Detail User Konek (${upUsers.length}):</b>\n`
+        + `⚠️ Sisa PPPoE Tidak Konek: <b>${allOffline.length} User</b>\n\n`
+        + `<b>User Kembali Konek (${upUsers.length}):</b>\n`
         + shown.join('\n');
       if (upUsers.length > MAX_LIST) {
         msg += `\n<i>...dan ${upUsers.length - MAX_LIST} user lainnya</i>`;
+      }
+      if (allOffline.length) {
+        msg += `\n\n<b>User yang Masih Tidak Konek (${allOffline.length}):</b>\n`
+          + allOffline.slice(0, 20).map((s) => `• <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
+        if (allOffline.length > 20) {
+          msg += `\n<i>...dan ${allOffline.length - 20} user lainnya</i>`;
+        }
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -673,13 +690,23 @@ http.createServer(async (req, res) => {
         const sm = c.summary();
         const pops = sm.pops.filter((x) => x.enabled);
         const popDowns = pops.filter((x) => x.status === 'down');
-        const popUps = pops.filter((x) => x.status === 'up');
+        const activeSet = new Set(c.active.map((a) => a.name));
+        const offlineUsers = c.secrets.filter((s) => s.disabled !== 'true' && !activeSet.has(s.name));
         statusSummary = `\n🖥 Router: <b>${escTg(c.r.name)}${c.identity ? ` (${escTg(c.identity)})` : ''}</b>\n`
-          + `👥 PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n`
-          + `📡 POP: <b>${popUps.length} UP</b> · <b>${popDowns.length} DOWN</b> (dari ${pops.length} POP)`;
+          + `📡 POP Tidak Konek: <b>${popDowns.length} POP</b>\n`
+          + `🔻 PPPoE Tidak Konek: <b>${offlineUsers.length} User</b>`;
         if (popDowns.length) {
-          statusSummary += `\n\n🚨 <b>POP Sedang Down (${popDowns.length}):</b>\n`
-            + popDowns.slice(0, 15).map((p, i) => `${i + 1}. <b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)`).join('\n');
+          statusSummary += `\n\n🚨 <b>Daftar POP Tidak Konek (${popDowns.length}):</b>\n`
+            + popDowns.slice(0, 20).map((p, i) => {
+              const loc = p.location ? ` · 📍 ${escTg(p.location)}` : '';
+              return `${i + 1}. <b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)${loc}`;
+            }).join('\n');
+          if (popDowns.length > 20) statusSummary += `\n<i>...dan ${popDowns.length - 20} POP lainnya</i>`;
+        }
+        if (offlineUsers.length) {
+          statusSummary += `\n\n🔻 <b>Daftar PPPoE Tidak Konek (${offlineUsers.length}):</b>\n`
+            + offlineUsers.slice(0, 30).map((s, i) => `${i + 1}. <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
+          if (offlineUsers.length > 30) statusSummary += `\n<i>...dan ${offlineUsers.length - 30} user lainnya</i>`;
         }
       }
       const msg = `🔔 <b>TES NOTIFIKASI TELEGRAM BERHASIL</b>\n`
