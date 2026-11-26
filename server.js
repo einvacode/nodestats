@@ -27,7 +27,7 @@ const DB = require('./db');
 const UPD = require('./update');
 const HIST_MAX = 360; // 360 * 10s = 1 hour
 
-// ---- Telegram Bot Notifier ----
+// ---- Telegram Bot Notifier (with Queue, Rate-Limiter & 429 Flood Protection) ----
 const escTg = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const fmtTimeTg = (ms = Date.now()) => new Date(ms).toLocaleString('id-ID', {
   day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -38,12 +38,25 @@ const fmtDurTg = (ms) => {
   s %= 60;
   return d ? `${d}h ${h}j ${m}m` : h ? `${h}j ${m}m` : m ? `${m}m ${s}d` : `${s}d`;
 };
+const TG_MAX_LEN = 3900; // Telegram hard limit is 4096 chars
+const TG_MIN_INTERVAL_MS = 3200; // >=3.2s gap between messages (~18 msg/min, safe for Telegram groups limit of 20/min)
+const tgQueue = [];
+let tgWorkerRunning = false;
+let tgLastSentAt = 0;
+let tgCooldownUntil = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function clampTgHtml(text) {
+  if (text.length <= TG_MAX_LEN) return text;
+  return text.slice(0, TG_MAX_LEN - 40).replace(/<[^>]*$/, '') + '\n<i>...(pesan dipotong)</i>';
+}
 
 function tgPostOne(botToken, chatId, text) {
   return new Promise((resolve, reject) => {
+    const safeText = clampTgHtml(text);
     const payload = Buffer.from(JSON.stringify({
       chat_id: chatId,
-      text,
+      text: safeText,
       parse_mode: 'HTML',
       disable_web_page_preview: true,
     }));
@@ -61,7 +74,11 @@ function tgPostOne(botToken, chatId, text) {
         const body = Buffer.concat(chunks).toString();
         try {
           const j = JSON.parse(body);
-          if (!j.ok) return reject(new Error(j.description || `HTTP ${res.statusCode}`));
+          if (!j.ok) {
+            const err = new Error(j.description || `HTTP ${res.statusCode}`);
+            err.retryAfter = j.parameters?.retry_after || (res.statusCode === 429 ? 30 : 0);
+            return reject(err);
+          }
           resolve(j);
         } catch {
           if (res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode}: ${body.slice(0, 160)}`));
@@ -83,14 +100,45 @@ async function sendTelegramMessage(text, overrideCfg = null) {
   const rawChats = String(tg.chatId || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
   if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID wajib diisi');
   const results = [];
-  for (const cid of rawChats) {
-    results.push(await tgPostOne(token, cid, text));
+  for (let i = 0; i < rawChats.length; i++) {
+    if (i > 0) await sleep(1200); // safe pacing across multiple chat IDs
+    results.push(await tgPostOne(token, rawChats[i], text));
   }
   return { ok: true, sent: results.length };
 }
 
+async function processTgQueue() {
+  if (tgWorkerRunning) return;
+  tgWorkerRunning = true;
+  while (tgQueue.length > 0) {
+    const now = Date.now();
+    const waitMs = Math.max(0, tgCooldownUntil - now, (tgLastSentAt + TG_MIN_INTERVAL_MS) - now);
+    if (waitMs > 0) await sleep(waitMs);
+    const item = tgQueue.shift();
+    if (!item) break;
+    try {
+      await sendTelegramMessage(item.text);
+      tgLastSentAt = Date.now();
+    } catch (e) {
+      tgLastSentAt = Date.now();
+      if (e.retryAfter && !item.retried) {
+        const waitSec = Math.min(300, Math.max(5, +e.retryAfter || 30));
+        console.warn(`[telegram] Rate limit 429, tunda ${waitSec} detik...`);
+        tgCooldownUntil = Date.now() + (waitSec + 1) * 1000;
+        item.retried = true;
+        tgQueue.unshift(item);
+      } else {
+        console.error('[telegram]', e.message);
+      }
+    }
+  }
+  tgWorkerRunning = false;
+}
+
 function queueTelegram(text) {
-  sendTelegramMessage(text).catch((e) => console.error('[telegram]', e.message));
+  if (tgQueue.length >= 40) tgQueue.shift(); // Drop oldest if queue overflows to prevent flood backlog
+  tgQueue.push({ text, retried: false });
+  processTgQueue();
 }
 
 
@@ -250,41 +298,31 @@ class Collector {
     const upChanges = changes.filter((c) => c.status === 'up');
 
     if (downChanges.length && tg.popDown) {
-      const lines = downChanges.map((c, idx) => {
-        const loc = c.pop.location ? ` · 📍 ${escTg(c.pop.location)}` : '';
-        const note = c.pop.notes ? ` · 📝 ${escTg(c.pop.notes)}` : '';
-        return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${loc}${note}`;
-      });
+      const listStr = downChanges.map((c) => `<b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>${c.pop.location ? ` - ${escTg(c.pop.location)}` : ''})`).join(', ');
       const otherDowns = curDowns.filter((d) => !downChanges.some((c) => c.pop.id === d.id));
-      let msg = `🚨 <b>POP TIDAK KONEK / DOWN (${downChanges.length} POP)</b>\n`
+      let msg = `🚨 <b>POP TIDAK KONEK (${downChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Total POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
-        + `<b>Daftar POP Baru Down (${downChanges.length}):</b>\n`
-        + lines.join('\n');
+        + `<b>POP Baru Down (${downChanges.length}):</b>\n${listStr}`;
       if (otherDowns.length) {
-        msg += `\n\n<b>POP Lain yang Masih Tidak Konek (${otherDowns.length}):</b>\n`
-          + otherDowns.slice(0, 20).map((d) => `• <b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)${d.downSince ? ` – down ${fmtDurTg(Date.now() - d.downSince)}` : ''}`).join('\n');
-        if (otherDowns.length > 20) msg += `\n<i>...dan ${otherDowns.length - 20} POP lainnya</i>`;
+        const otherStr = otherDowns.slice(0, 50).map((d) => `<b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join(', ');
+        msg += `\n\n<b>POP Lain Masih Tidak Konek (${otherDowns.length}):</b>\n${otherStr}`
+          + (otherDowns.length > 50 ? `, <i>...dan ${otherDowns.length - 50} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
     }
 
     if (upChanges.length && tg.popUp) {
-      const lines = upChanges.map((c, idx) => {
-        const dur = c.prevDownSince ? ` · Durasi putus: <b>${fmtDurTg(c.now - c.prevDownSince)}</b>` : '';
-        const rtt = c.rttMs != null ? ` · Ping: ${c.rttMs} ms` : '';
-        const loc = c.pop.location ? ` · 📍 ${escTg(c.pop.location)}` : '';
-        return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${rtt}${dur}${loc}`;
-      });
+      const listStr = upChanges.map((c) => `<b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>${c.prevDownSince ? ` - down ${fmtDurTg(c.now - c.prevDownSince)}` : ''})`).join(', ');
       let msg = `✅ <b>POP KEMBALI KONEK (${upChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Sisa POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
-        + `<b>Daftar POP Kembali Konek (${upChanges.length}):</b>\n`
-        + lines.join('\n');
+        + `<b>POP Kembali Konek (${upChanges.length}):</b>\n${listStr}`;
       if (curDowns.length) {
-        msg += `\n\n<b>POP yang Masih Tidak Konek (${curDowns.length}):</b>\n`
-          + curDowns.slice(0, 15).map((d) => `• <b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join('\n');
+        const downStr = curDowns.slice(0, 50).map((d) => `<b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join(', ');
+        msg += `\n\n<b>POP Masih Tidak Konek (${curDowns.length}):</b>\n${downStr}`
+          + (curDowns.length > 50 ? `, <i>...dan ${curDowns.length - 50} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -414,61 +452,39 @@ class Collector {
     if (!tg.enabled) return;
     const brand = DB.getSettings().companyName || 'NodeStats';
     const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
-    const secMap = new Map(this.secrets.map((s) => [s.name, s]));
     const activeSet = new Set(this.active.map((a) => a.name));
     const allOffline = this.secrets.filter((s) => s.disabled !== 'true' && !activeSet.has(s.name));
-    const MAX_LIST = 45;
+    const MAX_LIST = 150;
 
     if (downUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeDown) {
       const downSet = new Set(downUsers.map((u) => u.name));
       const otherOffline = allOffline.filter((s) => !downSet.has(s.name));
-      const shown = downUsers.slice(0, MAX_LIST).map((u, idx) => {
-        const sec = secMap.get(u.name);
-        const prof = sec?.profile ? ` [${escTg(sec.profile)}]` : '';
-        const ip = u.address ? ` · IP: <code>${escTg(u.address)}</code>` : '';
-        const up = u.uptime ? ` · Uptime: ${escTg(u.uptime)}` : '';
-        return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}${up}`;
-      });
-      let msg = `🔻 <b>PPPoE TIDAK KONEK / PUTUS (${downUsers.length} User)</b>\n`
+      const shown = downUsers.slice(0, MAX_LIST).map((u) => `<b>${escTg(u.name)}</b>`).join(', ');
+      let msg = `🔻 <b>PPPoE TIDAK KONEK (${downUsers.length} User Baru Putus)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Total PPPoE Tidak Konek: <b>${allOffline.length} User</b>\n\n`
         + `<b>User Baru Putus (${downUsers.length}):</b>\n`
-        + shown.join('\n');
-      if (downUsers.length > MAX_LIST) {
-        msg += `\n<i>...dan ${downUsers.length - MAX_LIST} user lainnya</i>`;
-      }
+        + shown + (downUsers.length > MAX_LIST ? `, <i>...dan ${downUsers.length - MAX_LIST} lainnya</i>` : '');
       if (otherOffline.length) {
-        msg += `\n\n<b>User Lain yang Masih Tidak Konek (${otherOffline.length}):</b>\n`
-          + otherOffline.slice(0, 25).map((s) => `• <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
-        if (otherOffline.length > 25) {
-          msg += `\n<i>...dan ${otherOffline.length - 25} user lainnya</i>`;
-        }
+        const otherStr = otherOffline.slice(0, MAX_LIST).map((s) => escTg(s.name)).join(', ');
+        msg += `\n\n<b>User Lain Masih Tidak Konek (${otherOffline.length}):</b>\n`
+          + otherStr + (otherOffline.length > MAX_LIST ? `, <i>...dan ${otherOffline.length - MAX_LIST} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
     }
 
     if (upUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeUp) {
-      const shown = upUsers.slice(0, MAX_LIST).map((u, idx) => {
-        const sec = secMap.get(u.name);
-        const prof = sec?.profile ? ` [${escTg(sec.profile)}]` : '';
-        const ip = u.address ? ` · IP: <code>${escTg(u.address)}</code>` : '';
-        return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}`;
-      });
+      const shown = upUsers.slice(0, MAX_LIST).map((u) => `<b>${escTg(u.name)}</b>`).join(', ');
       let msg = `🟢 <b>PPPoE KEMBALI KONEK (${upUsers.length} User)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Sisa PPPoE Tidak Konek: <b>${allOffline.length} User</b>\n\n`
         + `<b>User Kembali Konek (${upUsers.length}):</b>\n`
-        + shown.join('\n');
-      if (upUsers.length > MAX_LIST) {
-        msg += `\n<i>...dan ${upUsers.length - MAX_LIST} user lainnya</i>`;
-      }
+        + shown + (upUsers.length > MAX_LIST ? `, <i>...dan ${upUsers.length - MAX_LIST} lainnya</i>` : '');
       if (allOffline.length) {
-        msg += `\n\n<b>User yang Masih Tidak Konek (${allOffline.length}):</b>\n`
-          + allOffline.slice(0, 20).map((s) => `• <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
-        if (allOffline.length > 20) {
-          msg += `\n<i>...dan ${allOffline.length - 20} user lainnya</i>`;
-        }
+        const offStr = allOffline.slice(0, MAX_LIST).map((s) => escTg(s.name)).join(', ');
+        msg += `\n\n<b>User Masih Tidak Konek (${allOffline.length}):</b>\n`
+          + offStr + (allOffline.length > MAX_LIST ? `, <i>...dan ${allOffline.length - MAX_LIST} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -696,17 +712,14 @@ http.createServer(async (req, res) => {
           + `📡 POP Tidak Konek: <b>${popDowns.length} POP</b>\n`
           + `🔻 PPPoE Tidak Konek: <b>${offlineUsers.length} User</b>`;
         if (popDowns.length) {
-          statusSummary += `\n\n🚨 <b>Daftar POP Tidak Konek (${popDowns.length}):</b>\n`
-            + popDowns.slice(0, 20).map((p, i) => {
-              const loc = p.location ? ` · 📍 ${escTg(p.location)}` : '';
-              return `${i + 1}. <b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)${loc}`;
-            }).join('\n');
-          if (popDowns.length > 20) statusSummary += `\n<i>...dan ${popDowns.length - 20} POP lainnya</i>`;
+          statusSummary += `\n\n🚨 <b>POP Tidak Konek (${popDowns.length}):</b>\n`
+            + popDowns.slice(0, 50).map((p) => `<b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)`).join(', ');
+          if (popDowns.length > 50) statusSummary += `, <i>...dan ${popDowns.length - 50} lainnya</i>`;
         }
         if (offlineUsers.length) {
-          statusSummary += `\n\n🔻 <b>Daftar PPPoE Tidak Konek (${offlineUsers.length}):</b>\n`
-            + offlineUsers.slice(0, 30).map((s, i) => `${i + 1}. <b>${escTg(s.name)}</b>${s.profile ? ` [${escTg(s.profile)}]` : ''}`).join('\n');
-          if (offlineUsers.length > 30) statusSummary += `\n<i>...dan ${offlineUsers.length - 30} user lainnya</i>`;
+          statusSummary += `\n\n🔻 <b>PPPoE Tidak Konek (${offlineUsers.length}):</b>\n`
+            + offlineUsers.slice(0, 150).map((s) => `<b>${escTg(s.name)}</b>`).join(', ');
+          if (offlineUsers.length > 150) statusSummary += `, <i>...dan ${offlineUsers.length - 150} lainnya</i>`;
         }
       }
       const msg = `🔔 <b>TES NOTIFIKASI TELEGRAM BERHASIL</b>\n`
