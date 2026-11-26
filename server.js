@@ -93,18 +93,22 @@ function tgPostOne(botToken, chatId, text) {
   });
 }
 
-async function sendTelegramMessage(text, overrideCfg = null) {
-  const tg = overrideCfg || DB.getTelegramSettings();
+async function sendTelegramMessage(text, overrideCfg = null, routerId = null) {
+  const tg = overrideCfg ? { ...DB.getTelegramSettings(), ...overrideCfg } : DB.getTelegramSettings();
   if (!overrideCfg && !tg.enabled) return { ok: false, skipped: true };
   const token = String(tg.botToken || '').trim();
-  const rawChats = String(tg.chatId || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
-  if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID wajib diisi');
+  const rChat = routerId ? String((tg.routerChats && tg.routerChats[routerId]) || DB.getRouter(routerId)?.tg_chat_id || '').trim() : '';
+  const targetChatStr = (overrideCfg && overrideCfg.chatId !== undefined)
+    ? String(overrideCfg.chatId || '').trim()
+    : (rChat || String(tg.chatId || '').trim());
+  const rawChats = targetChatStr.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID (Utama atau Router) wajib diisi');
   const results = [];
   for (let i = 0; i < rawChats.length; i++) {
     if (i > 0) await sleep(1200); // safe pacing across multiple chat IDs
     results.push(await tgPostOne(token, rawChats[i], text));
   }
-  return { ok: true, sent: results.length };
+  return { ok: true, sent: results.length, targets: rawChats };
 }
 
 async function processTgQueue() {
@@ -117,7 +121,7 @@ async function processTgQueue() {
     const item = tgQueue.shift();
     if (!item) break;
     try {
-      await sendTelegramMessage(item.text);
+      await sendTelegramMessage(item.text, null, item.routerId);
       tgLastSentAt = Date.now();
     } catch (e) {
       tgLastSentAt = Date.now();
@@ -135,9 +139,9 @@ async function processTgQueue() {
   tgWorkerRunning = false;
 }
 
-function queueTelegram(text) {
+function queueTelegram(text, routerId = null) {
   if (tgQueue.length >= 40) tgQueue.shift(); // Drop oldest if queue overflows to prevent flood backlog
-  tgQueue.push({ text, retried: false });
+  tgQueue.push({ text, routerId, retried: false });
   processTgQueue();
 }
 
@@ -310,7 +314,7 @@ class Collector {
           + (otherDowns.length > 80 ? `, <i>...dan ${otherDowns.length - 80} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
-      queueTelegram(msg);
+      queueTelegram(msg, this.id);
     }
 
     if (upChanges.length && tg.popUp) {
@@ -325,7 +329,7 @@ class Collector {
           + (curDowns.length > 80 ? `, <i>...dan ${curDowns.length - 80} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
-      queueTelegram(msg);
+      queueTelegram(msg, this.id);
     }
   }
   async pollPops() {
@@ -423,7 +427,7 @@ class Collector {
         if (tg.enabled && tg.routerDown) {
           const brand = DB.getSettings().companyName || 'NodeStats';
           const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
-          queueTelegram(`✅ <b>ROUTER TERHUBUNG KEMBALI</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n⚠️ PPPoE Tidak Konek: <b>${sm.pppoe.offline} User</b>\n🕒 Waktu: ${fmtTimeTg(now)}`);
+          queueTelegram(`✅ <b>ROUTER TERHUBUNG KEMBALI</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n⚠️ PPPoE Tidak Konek: <b>${sm.pppoe.offline} User</b>\n🕒 Waktu: ${fmtTimeTg(now)}`, this.id);
         }
       } else {
         this.failCount = 0;
@@ -441,7 +445,7 @@ class Collector {
         if (tg.enabled && tg.routerDown) {
           const brand = DB.getSettings().companyName || 'NodeStats';
           const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
-          queueTelegram(`🚨 <b>ROUTER TERPUTUS / TIDAK DAPAT DIAKSES!</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n🌐 Host: <code>${escTg(this.r.host)}:${this.r.port}</code>\n⚠️ Error: <code>${escTg(e.message)}</code>\n🕒 Waktu: ${fmtTimeTg()}`);
+          queueTelegram(`🚨 <b>ROUTER TERPUTUS / TIDAK DAPAT DIAKSES!</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n🌐 Host: <code>${escTg(this.r.host)}:${this.r.port}</code>\n⚠️ Error: <code>${escTg(e.message)}</code>\n🕒 Waktu: ${fmtTimeTg()}`, this.id);
         }
       }
     }
@@ -471,7 +475,7 @@ class Collector {
           + otherStr + (otherOffline.length > MAX_LIST ? `, <i>...dan ${otherOffline.length - MAX_LIST} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
-      queueTelegram(msg);
+      queueTelegram(msg, this.id);
     }
 
     if (upUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeUp) {
@@ -487,7 +491,7 @@ class Collector {
           + offStr + (allOffline.length > MAX_LIST ? `, <i>...dan ${allOffline.length - MAX_LIST} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
-      queueTelegram(msg);
+      queueTelegram(msg, this.id);
     }
   }
   async pollSlow() {
@@ -563,19 +567,21 @@ DB.listRouters().forEach(startCollector);
 const publicRouter = (r) => {
   const c = collectors.get(r.id), s = c && r.enabled ? c.summary() : null;
   return { id: r.id, name: r.name, host: r.host, port: r.port, scheme: r.scheme, user: r.user, insecure: !!r.insecure, enabled: !!r.enabled, hasPass: !!r.pass,
+    tgChatId: r.tg_chat_id || '',
     status: s && { updated: s.updated, error: s.error, identity: s.identity, online: s.pppoe.online, offline: s.pppoe.offline, cpu: s.router.cpu } };
 };
 function cleanInput(b, partial) {
   const o = {};
   const str = (k, max = 120) => { if (b[k] !== undefined) o[k] = String(b[k]).trim().slice(0, max); };
   ['name', 'host', 'user'].forEach((k) => str(k)); str('pass', 200);
+  if (b.tgChatId !== undefined) o.tg_chat_id = String(b.tgChatId).trim().slice(0, 200);
   if (b.scheme !== undefined) o.scheme = b.scheme === 'http' ? 'http' : 'https';
   if (b.port !== undefined) o.port = Math.min(65535, Math.max(1, +b.port || 443));
   if (b.insecure !== undefined) o.insecure = !!b.insecure;
   if (b.enabled !== undefined) o.enabled = !!b.enabled;
   if (!partial) {
     if (!o.name || !o.host) throw new Error('Nama dan host wajib diisi');
-    Object.assign(o, { port: o.port ?? 443, scheme: o.scheme ?? 'https', user: o.user || 'monitor', pass: o.pass || '', insecure: o.insecure ?? true });
+    Object.assign(o, { port: o.port ?? 443, scheme: o.scheme ?? 'https', user: o.user || 'monitor', pass: o.pass || '', insecure: o.insecure ?? true, tg_chat_id: o.tg_chat_id || '' });
   }
   return o;
 }
@@ -694,13 +700,15 @@ http.createServer(async (req, res) => {
     if (u.pathname === '/api/telegram/test' && req.method === 'POST') {
       const b = await readBody(req);
       const saved = DB.getTelegramSettings();
+      const rid = +b.routerId || +q.get('router') || [...collectors.keys()][0];
+      const c = collectors.get(rid);
+      const rRow = rid ? DB.getRouter(rid) : null;
+      const customChat = b.chatId !== undefined ? String(b.chatId).trim() : (rRow?.tg_chat_id || saved.chatId);
       const cfg = {
         botToken: b.botToken !== undefined ? b.botToken : saved.botToken,
-        chatId: b.chatId !== undefined ? b.chatId : saved.chatId,
+        chatId: customChat,
       };
       const brand = DB.getSettings().companyName || 'NodeStats';
-      const rid = +q.get('router') || [...collectors.keys()][0];
-      const c = collectors.get(rid);
       let statusSummary = '';
       if (c) {
         const sm = c.summary();
@@ -727,8 +735,8 @@ http.createServer(async (req, res) => {
         + `✅ Bot Telegram sudah terhubung dan siap mengirimkan notifikasi POP Down/Up & Pelanggan PPPoE Down.\n`
         + `🕒 Waktu: ${fmtTimeTg()}`;
       try {
-        const r = await sendTelegramMessage(msg, cfg);
-        return send(res, 200, { ok: true, sent: r.sent });
+        const r = await sendTelegramMessage(msg, cfg, rid);
+        return send(res, 200, { ok: true, sent: r.sent, targets: r.targets });
       } catch (e) {
         return send(res, 400, { error: 'Gagal kirim ke Telegram: ' + e.message });
       }
@@ -796,7 +804,10 @@ http.createServer(async (req, res) => {
       if (!canAccessRouter(+m[1])) return send(res, 403, { error: 'Akses router ditolak' });
       const row = DB.updateRouter(+m[1], cleanInput(await readBody(req), true));
       if (!row) return send(res, 404, { error: 'not found' });
-      startCollector(row); return send(res, 200, publicRouter(row));
+      const existing = collectors.get(row.id);
+      const connChanged = !existing || existing.r.host !== row.host || existing.r.port !== row.port || existing.r.scheme !== row.scheme || existing.r.user !== row.user || existing.r.pass !== row.pass || existing.r.insecure !== row.insecure || existing.r.enabled !== row.enabled;
+      if (connChanged) startCollector(row); else existing.r = row;
+      return send(res, 200, publicRouter(row));
     }
     if (m && req.method === 'DELETE') {
       if (isRestrictedUser) return send(res, 403, { error: 'Akun Anda tidak diizinkan menghapus router' });
