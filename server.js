@@ -782,7 +782,7 @@ http.createServer(async (req, res) => {
     }
 
     // Helper: check which routers this user is allowed to access (empty routerIds = all routers)
-    const isRestrictedUser = authUser.role !== 'admin' && Array.isArray(authUser.routerIds) && authUser.routerIds.length > 0;
+    const isRestrictedUser = !!(authUser && authUser.role !== 'admin' && Array.isArray(authUser.routerIds) && authUser.routerIds.length > 0);
     const canAccessRouter = (id) => !isRestrictedUser || authUser.routerIds.includes(+id);
 
     // router management
