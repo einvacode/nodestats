@@ -63,7 +63,10 @@ try {
     flex-direction: column;
     flex: 1 1 auto;
   }
-  @media (orientation: portrait) and (min-height: 900px) {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  /* Only apply vertical monitor auto-stretch on large desktop portrait monitors (width >= 768px), NOT on mobile phones */
+  @media (orientation: portrait) and (min-width: 768px) and (min-height: 900px) {
     #chartsGrid {
       grid-template-columns: 1fr !important;
       flex: 1 1 auto;
@@ -124,43 +127,49 @@ try {
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col w-full">
 <header id="topHeader" class="w-full bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
-  <div class="max-w-7xl mx-auto px-3 sm:px-4 pt-2.5 pb-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
-    <div class="flex items-center gap-2 min-w-[9.5rem] flex-1">
-      <div id="brandLogoBox" class="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold overflow-hidden shrink-0">N</div>
+  <div class="max-w-7xl mx-auto px-2.5 sm:px-4 pt-2 pb-1.5 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0 flex-1">
+      <div id="brandLogoBox" class="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-sky-500/20 text-sky-400 grid place-items-center font-bold overflow-hidden shrink-0 text-sm sm:text-base">N</div>
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          <h1 class="font-semibold leading-tight truncate text-sm sm:text-base"><span id="brandName">NodeStats</span> <span id="identity" class="hidden sm:inline text-slate-400 font-normal"></span></h1>
+        <div class="flex items-center gap-1.5 min-w-0">
+          <h1 class="font-semibold leading-tight truncate text-sm sm:text-base"><span id="brandName">NodeStats</span> <span id="identity" class="hidden md:inline text-slate-400 font-normal"></span></h1>
           <span id="brandTagline" class="hidden lg:inline text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0"></span>
         </div>
         <p id="routerInfo" class="text-[11px] sm:text-xs text-slate-500 truncate">memuat…</p>
       </div>
     </div>
-    <div class="flex items-center gap-1 shrink-0 ml-auto">
-      <select id="routerSel" aria-label="Pilih Router" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 sm:py-1.5 text-xs sm:text-sm max-w-[6.25rem] sm:max-w-[11rem] md:max-w-xs truncate focus:outline-none focus:border-sky-500"></select>
-      <button id="pwaInstallBtn" title="Install Aplikasi (PWA)" aria-label="Install Aplikasi" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 text-xs font-medium shrink-0">Install</button>
+    <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      <select id="routerSel" aria-label="Pilih Router" class="h-7 sm:h-8 bg-slate-800 border border-slate-700 rounded-lg px-1.5 sm:px-2.5 text-xs sm:text-sm max-w-[7.25rem] sm:max-w-[12rem] md:max-w-xs truncate focus:outline-none focus:border-sky-500"></select>
+      <button id="pwaInstallBtn" title="Install Aplikasi (PWA)" aria-label="Install Aplikasi" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 text-xs font-medium shrink-0 inline-flex items-center gap-1">
+        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="hidden sm:inline">Install</span>
+      </button>
       <button id="themeBtn" type="button" title="Ganti Tema Terang / Gelap" aria-label="Ganti Tema Terang atau Gelap" class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
-        <svg id="iconSun" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        <svg id="iconMoon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg id="iconSun" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="iconMoon" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </button>
       <button id="updBtn" title="Update aplikasi" aria-label="Update aplikasi" class="relative h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         <span id="updDot" class="hidden absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-slate-900"></span>
       </button>
       <button id="mgrBtn" title="Kelola router" aria-label="Kelola router" class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 grid place-items-center text-slate-300 shrink-0 transition-colors">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
       </button>
       <span id="userBadge" class="hidden"></span>
-      <button id="logoutBtn" title="Keluar / Logout" aria-label="Keluar" class="hidden h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-rose-950/60 hover:border-rose-500/40 hover:text-rose-300 text-xs font-medium shrink-0">Keluar</button>
+      <button id="logoutBtn" title="Keluar / Logout" aria-label="Keluar" class="hidden h-7 w-7 sm:h-8 sm:w-auto sm:px-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-rose-950/60 hover:border-rose-500/40 hover:text-rose-300 text-xs font-medium shrink-0 inline-flex items-center justify-center gap-1">
+        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="hidden sm:inline">Keluar</span>
+      </button>
     </div>
   </div>
-  <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
-    <nav id="tabs" class="flex gap-1 overflow-x-auto text-xs sm:text-sm min-w-0"></nav>
+  <div class="max-w-7xl mx-auto px-2.5 sm:px-4 flex items-center justify-between gap-2 border-t border-slate-800/40 sm:border-t-0">
+    <nav id="tabs" class="flex gap-1 overflow-x-auto no-scrollbar text-xs sm:text-sm min-w-0"></nav>
     <div class="flex items-center gap-1.5 text-[11px] sm:text-xs shrink-0">
       <span id="mobileUserBadge" class="hidden sm:hidden px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium"></span>
       <span id="demoBadge" class="hidden px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">DEMO</span>
       <span id="statusBadge" class="hidden sm:inline px-2 py-0.5 rounded bg-slate-800 text-slate-400">…</span>
-      <span id="live" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span id="updated" class="text-slate-500 tabular-nums"></span>
+      <span id="live" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+      <span id="updated" class="text-slate-500 tabular-nums whitespace-nowrap"></span>
     </div>
   </div>
 </header>
@@ -187,31 +196,31 @@ try {
   </div>
 
   <!-- KPI cards -->
-  <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">PPPoE Online</p><p id="kOnline" class="text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5">-</p></div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">PPPoE Offline</p><p id="kOffline" class="text-2xl font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5">-</p></div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3"><p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Total Secret</p><p id="kEnabled" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kDisabled" class="text-xs text-slate-500 tabular-nums"></p></div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
-      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Rasio PPPoE</p><p id="kPct" class="text-2xl font-semibold tabular-nums tracking-tight text-sky-400 mt-0.5">-</p>
-      <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
+  <section id="kpiSection" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Online</p><p id="kOnline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5 truncate">-</p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">PPPoE Offline</p><p id="kOffline" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5 truncate">-</p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0"><p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Total Secret</p><p id="kEnabled" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kDisabled" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate"></p></div>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0">
+      <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Rasio PPPoE</p><p id="kPct" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-sky-400 mt-0.5 truncate">-</p>
+      <div class="h-1.5 rounded bg-slate-800 mt-2 overflow-hidden"><div id="kPctBar" class="h-1.5 rounded bg-sky-500" style="width:0"></div></div>
     </div>
-    <div id="kPopCard" class="rounded-lg bg-slate-900 border border-slate-800 p-3 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
-      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Jumlah POP</p><p id="kPopTotal" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kPopSub" class="text-xs text-slate-500 tabular-nums">0 aktif</p>
+    <div id="kPopCard" class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Jumlah POP</p><p id="kPopTotal" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kPopSub" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate">0 aktif</p>
     </div>
-    <div id="kPopPctCard" class="rounded-lg bg-slate-900 border border-slate-800 p-3 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
-      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Rasio POP</p><p id="kPopPct" class="text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5">-</p>
-      <div class="h-1.5 rounded bg-slate-800 mt-2"><div id="kPopPctBar" class="h-1.5 rounded bg-emerald-500 transition-all" style="width:0"></div></div>
+    <div id="kPopPctCard" class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0 cursor-pointer hover:border-slate-700 transition" title="Klik untuk buka Monitor POP">
+      <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Rasio POP</p><p id="kPopPct" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight text-emerald-400 mt-0.5 truncate">-</p>
+      <div class="h-1.5 rounded bg-slate-800 mt-2 overflow-hidden"><div id="kPopPctBar" class="h-1.5 rounded bg-emerald-500 transition-all" style="width:0"></div></div>
     </div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
-      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">CPU Load</p><p id="kCpu" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kCpuSub" class="text-xs text-slate-500 tabular-nums"></p>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0">
+      <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">CPU Load</p><p id="kCpu" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kCpuSub" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate"></p>
     </div>
-    <div class="rounded-lg bg-slate-900 border border-slate-800 p-3">
-      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Memori / Suhu</p><p id="kMem" class="text-2xl font-semibold tabular-nums tracking-tight mt-0.5">-</p><p id="kTemp" class="text-xs text-slate-500 tabular-nums"></p>
+    <div class="rounded-lg bg-slate-900 border border-slate-800 p-2.5 sm:p-3 min-w-0">
+      <p class="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-slate-500 truncate">Memori / Suhu</p><p id="kMem" class="text-xl sm:text-2xl font-semibold tabular-nums tracking-tight mt-0.5 truncate">-</p><p id="kTemp" class="text-[11px] sm:text-xs text-slate-500 tabular-nums truncate"></p>
     </div>
   </section>
 
   <!-- Network sub-menu -->
-  <nav id="netTabs" class="grid grid-cols-2 sm:flex gap-1.5 rounded-xl bg-slate-900 border border-slate-800 p-1.5 text-xs sm:text-sm"></nav>
+  <nav id="netTabs" class="flex gap-1.5 overflow-x-auto no-scrollbar rounded-xl bg-slate-900 border border-slate-800 p-1.5 text-xs sm:text-sm"></nav>
 
   <div data-tab="grafik" class="space-y-4 sm:space-y-6 min-w-0">
   <!-- range -->
@@ -256,10 +265,10 @@ try {
       <input id="ifFilter" placeholder="Filter nama / tipe…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm w-full sm:w-56 focus:outline-none focus:border-sky-500">
     </div>
     <div class="overflow-x-auto flex-1">
-      <table class="w-full text-sm">
-        <thead class="text-xs text-slate-500 bg-slate-950/50"><tr>
-          <th class="text-left px-4 py-2">Status</th><th class="text-left px-4 py-2">Nama</th><th class="text-left px-4 py-2 hidden sm:table-cell">Tipe</th>
-          <th class="text-right px-4 py-2">Rx</th><th class="text-right px-4 py-2">Tx</th><th class="text-right px-4 py-2 hidden md:table-cell">Error</th><th class="text-right px-4 py-2 hidden md:table-cell">Drop</th><th class="text-left px-4 py-2 hidden lg:table-cell">Komentar</th>
+      <table class="w-full text-xs sm:text-sm">
+        <thead class="text-[11px] sm:text-xs text-slate-500 bg-slate-950/50"><tr>
+          <th class="text-left px-2.5 sm:px-4 py-2">Status</th><th class="text-left px-2.5 sm:px-4 py-2">Nama</th><th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Tipe</th>
+          <th class="text-right px-2.5 sm:px-4 py-2">Rx</th><th class="text-right px-2.5 sm:px-4 py-2">Tx</th><th class="text-right px-3 sm:px-4 py-2 hidden md:table-cell">Error</th><th class="text-right px-3 sm:px-4 py-2 hidden md:table-cell">Drop</th><th class="text-left px-3 sm:px-4 py-2 hidden lg:table-cell">Komentar</th>
         </tr></thead>
         <tbody id="ifBody" class="divide-y divide-slate-800"></tbody>
       </table>
@@ -270,25 +279,25 @@ try {
   <div data-tab="pppoe" class="space-y-4 sm:space-y-6">
   <!-- pppoe table -->
   <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex-1 flex flex-col">
-    <div class="p-4 flex items-center justify-between gap-2 flex-wrap">
+    <div class="p-3 sm:p-4 flex items-center justify-between gap-2 flex-wrap">
       <h2 class="text-sm font-medium">Pelanggan PPPoE <span id="pTotal" class="text-slate-500 font-normal"></span></h2>
       <div class="flex gap-2 w-full sm:w-auto">
-        <select id="pStatus" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
+        <select id="pStatus" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs sm:text-sm">
           <option value="all">Semua</option><option value="online">Online</option><option value="offline">Offline</option>
         </select>
-        <input id="pSearch" placeholder="Cari username / IP / MAC…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm w-full sm:w-64 focus:outline-none focus:border-sky-500">
+        <input id="pSearch" placeholder="Cari username / IP / MAC…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs sm:text-sm flex-1 sm:w-64 focus:outline-none focus:border-sky-500">
       </div>
     </div>
-    <div id="pScroll" tabindex="0" role="region" aria-label="Tabel pelanggan PPPoE" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-y border-slate-800/60 flex-1">
-      <table class="w-full text-sm">
-        <thead id="pHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10"><tr>
-          <th class="text-left px-4 py-2">Status</th><th class="text-left px-4 py-2">Username</th><th class="text-left px-4 py-2 hidden sm:table-cell">Profile</th>
-          <th class="text-left px-4 py-2">IP</th><th class="text-left px-4 py-2 hidden md:table-cell">MAC</th><th class="text-left px-4 py-2 hidden sm:table-cell">Uptime</th>
+    <div id="pScroll" tabindex="0" role="region" aria-label="Tabel pelanggan PPPoE" class="overflow-auto max-h-[340px] sm:max-h-[218px] border-y border-slate-800/60 flex-1">
+      <table class="w-full text-xs sm:text-sm">
+        <thead id="pHead" class="text-[11px] sm:text-xs text-slate-500 bg-slate-950 sticky top-0 z-10"><tr>
+          <th class="text-left px-2.5 sm:px-4 py-2">Status</th><th class="text-left px-2.5 sm:px-4 py-2">Username</th><th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Profile</th>
+          <th class="text-left px-2.5 sm:px-4 py-2">IP</th><th class="text-left px-3 sm:px-4 py-2 hidden md:table-cell">MAC</th><th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">Uptime</th>
         </tr></thead>
         <tbody id="pBody" class="divide-y divide-slate-800"></tbody>
       </table>
     </div>
-    <div class="p-3 flex items-center justify-between text-sm">
+    <div class="p-3 flex items-center justify-between text-xs sm:text-sm">
       <button id="pPrev" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">‹ Prev</button>
       <span id="pPage" class="text-slate-500"></span>
       <button id="pNext" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Next ›</button>
@@ -298,32 +307,32 @@ try {
   <div data-tab="riwayat" class="space-y-4 sm:space-y-6">
   <!-- events -->
   <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex-1 flex flex-col">
-    <div class="p-4 space-y-3">
+    <div class="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <h2 class="text-sm font-medium">Riwayat Putus / Konek PPPoE <span id="evTotal" class="text-slate-500 font-normal"></span></h2>
         <div id="evSum" class="text-xs text-slate-400 flex gap-3 flex-wrap"></div>
       </div>
-      <div class="flex gap-2 flex-wrap items-center">
-        <input id="evDate" type="date" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm [color-scheme:dark]">
-        <select id="evSpan" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm">
-          <option value="1">1 hari</option><option value="7">7 hari sampai tanggal ini</option><option value="30">30 hari sampai tanggal ini</option>
+      <div class="grid grid-cols-2 sm:flex gap-2 items-center">
+        <input id="evDate" type="date" class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs sm:text-sm [color-scheme:dark] w-full sm:w-auto">
+        <select id="evSpan" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs sm:text-sm w-full sm:w-auto">
+          <option value="1">1 hari</option><option value="7">7 hari s/d tgl ini</option><option value="30">30 hari s/d tgl ini</option>
         </select>
-        <select id="evSort" aria-label="Urutkan riwayat" class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-sm">
+        <select id="evSort" aria-label="Urutkan riwayat" class="col-span-2 sm:col-span-1 bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs sm:text-sm w-full sm:w-auto">
           <option value="downs">Urut: Paling Sering Putus</option>
           <option value="last_down">Urut: Terakhir Putus (Terbaru)</option>
           <option value="oldest_down">Urut: Terakhir Putus (Terlama)</option>
           <option value="name">Urut: Username (A–Z)</option>
         </select>
-        <input id="evSearch" placeholder="Cari username…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm flex-1 min-w-[10rem] focus:outline-none focus:border-sky-500">
+        <input id="evSearch" placeholder="Cari username…" class="col-span-2 sm:col-span-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs sm:text-sm flex-1 min-w-[10rem] focus:outline-none focus:border-sky-500">
       </div>
     </div>
-    <div id="evScroll" tabindex="0" role="region" aria-label="Tabel riwayat putus konek PPPoE" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-y border-slate-800/60 flex-1">
-      <table class="w-full text-sm">
-        <thead id="evHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10"></thead>
+    <div id="evScroll" tabindex="0" role="region" aria-label="Tabel riwayat putus konek PPPoE" class="overflow-auto max-h-[340px] sm:max-h-[218px] border-y border-slate-800/60 flex-1">
+      <table class="w-full text-xs sm:text-sm">
+        <thead id="evHead" class="text-[11px] sm:text-xs text-slate-500 bg-slate-950 sticky top-0 z-10"></thead>
         <tbody id="evBody" class="divide-y divide-slate-800"></tbody>
       </table>
     </div>
-    <div class="p-3 flex items-center justify-between text-sm">
+    <div class="p-3 flex items-center justify-between text-xs sm:text-sm">
       <button id="evPrev" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">‹ Prev</button>
       <span id="evPage" class="text-slate-500"></span>
       <button id="evNext" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Next ›</button>
@@ -332,38 +341,38 @@ try {
   </div>
   <div data-tab="pop" class="space-y-4 sm:space-y-6 hidden min-w-0">
     <!-- POP summary cards -->
-    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-        <p class="text-xs text-slate-500">Total POP</p>
-        <p id="popKTotal" class="text-2xl sm:text-3xl font-bold">-</p>
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs text-slate-500">Total POP</p>
+        <p id="popKTotal" class="text-xl sm:text-3xl font-bold mt-0.5">-</p>
       </div>
-      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-        <p class="text-xs text-slate-500">POP Online (UP)</p>
-        <p id="popKUp" class="text-2xl sm:text-3xl font-bold text-emerald-400">-</p>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs text-slate-500">POP Online (UP)</p>
+        <p id="popKUp" class="text-xl sm:text-3xl font-bold text-emerald-400 mt-0.5">-</p>
       </div>
-      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-        <p class="text-xs text-slate-500">POP Down</p>
-        <p id="popKDown" class="text-2xl sm:text-3xl font-bold text-rose-400">-</p>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs text-slate-500">POP Down</p>
+        <p id="popKDown" class="text-xl sm:text-3xl font-bold text-rose-400 mt-0.5">-</p>
       </div>
-      <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
-        <p class="text-xs text-slate-500">Rata-rata Ping</p>
-        <p id="popKRtt" class="text-2xl sm:text-3xl font-bold text-sky-400">-</p>
+      <div class="rounded-xl bg-slate-900 border border-slate-800 p-3 sm:p-4">
+        <p class="text-[11px] sm:text-xs text-slate-500">Rata-rata Ping</p>
+        <p id="popKRtt" class="text-xl sm:text-3xl font-bold text-sky-400 mt-0.5">-</p>
       </div>
     </section>
 
     <!-- POP form & table -->
     <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
-      <div class="p-4 space-y-3">
+      <div class="p-3 sm:p-4 space-y-3">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 class="text-sm font-medium">Monitoring POP (Ping IP via Router)</h2>
             <p class="text-xs text-slate-500">Pantau status IP POP / OLT / Radio secara otomatis. Alarm berbunyi jika ada POP yang DOWN.</p>
           </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <button id="popSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium">Suara Alarm: ON</button>
-            <button id="popTestSoundBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Tes Suara</button>
-            <button id="popCheckBtn" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Cek Sekarang</button>
-            <button id="popToggleFormBtn" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium">+ Tambah POP</button>
+          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto">
+            <button id="popSoundBtn" type="button" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium">Suara Alarm: ON</button>
+            <button id="popTestSoundBtn" type="button" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Tes Suara</button>
+            <button id="popCheckBtn" type="button" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs">Cek Sekarang</button>
+            <button id="popToggleFormBtn" type="button" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium ml-auto sm:ml-0">+ Tambah POP</button>
           </div>
         </div>
 
@@ -408,17 +417,17 @@ try {
         </div>
       </div>
 
-      <div id="popScroll" tabindex="0" role="region" aria-label="Tabel daftar POP" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-y border-slate-800/60">
-        <table class="w-full text-sm">
-          <thead id="popHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
+      <div id="popScroll" tabindex="0" role="region" aria-label="Tabel daftar POP" class="overflow-auto max-h-[340px] sm:max-h-[218px] border-y border-slate-800/60">
+        <table class="w-full text-xs sm:text-sm">
+          <thead id="popHead" class="text-[11px] sm:text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
             <tr>
-              <th class="text-left px-4 py-2">Status</th>
-              <th class="text-left px-4 py-2">Nama POP</th>
-              <th class="text-left px-4 py-2">IP Address</th>
-              <th class="text-right px-4 py-2">Ping / Loss</th>
-              <th class="text-left px-4 py-2 hidden sm:table-cell">Lokasi</th>
-              <th class="text-left px-4 py-2 hidden md:table-cell">Keterangan / Durasi</th>
-              <th class="text-right px-4 py-2">Aksi</th>
+              <th class="text-left px-2.5 sm:px-4 py-2">Status</th>
+              <th class="text-left px-2.5 sm:px-4 py-2">Nama POP</th>
+              <th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">IP Address</th>
+              <th class="text-right px-2.5 sm:px-4 py-2">Ping / Loss</th>
+              <th class="text-left px-3 sm:px-4 py-2 hidden md:table-cell">Lokasi</th>
+              <th class="text-left px-3 sm:px-4 py-2 hidden lg:table-cell">Keterangan / Durasi</th>
+              <th class="text-right px-2.5 sm:px-4 py-2">Aksi</th>
             </tr>
           </thead>
           <tbody id="popBody" class="divide-y divide-slate-800"></tbody>
@@ -428,18 +437,18 @@ try {
 
     <!-- POP down/up log history -->
     <section class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
-      <div class="p-4 flex items-center justify-between gap-2 flex-wrap">
+      <div class="p-3 sm:p-4 flex items-center justify-between gap-2 flex-wrap">
         <h2 class="text-sm font-medium">Riwayat Putus / Nyambung POP <span id="popEvCount" class="text-slate-500 font-normal"></span></h2>
       </div>
-      <div id="popEvScroll" tabindex="0" role="region" aria-label="Tabel riwayat kejadian POP" class="overflow-auto max-h-[297px] sm:max-h-[218px] border-t border-slate-800/60">
-        <table class="w-full text-sm">
-          <thead id="popEvHead" class="text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
+      <div id="popEvScroll" tabindex="0" role="region" aria-label="Tabel riwayat kejadian POP" class="overflow-auto max-h-[300px] sm:max-h-[218px] border-t border-slate-800/60">
+        <table class="w-full text-xs sm:text-sm">
+          <thead id="popEvHead" class="text-[11px] sm:text-xs text-slate-500 bg-slate-950 sticky top-0 z-10">
             <tr>
-              <th class="text-left px-4 py-2">Waktu</th>
-              <th class="text-left px-4 py-2">Status</th>
-              <th class="text-left px-4 py-2">Nama POP</th>
-              <th class="text-left px-4 py-2">IP Address</th>
-              <th class="text-left px-4 py-2 hidden sm:table-cell">Detail</th>
+              <th class="text-left px-2.5 sm:px-4 py-2">Waktu</th>
+              <th class="text-left px-2.5 sm:px-4 py-2">Status</th>
+              <th class="text-left px-2.5 sm:px-4 py-2">Nama POP</th>
+              <th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell">IP Address</th>
+              <th class="text-left px-3 sm:px-4 py-2 hidden md:table-cell">Detail</th>
             </tr>
           </thead>
           <tbody id="popEvBody" class="divide-y divide-slate-800"></tbody>
@@ -936,13 +945,13 @@ drawRangeBtns();
 function renderIfaces() {
   const f = $('ifFilter').value.toLowerCase();
   $('ifBody').innerHTML = ifaces.filter((i) => `${i.name} ${i.type} ${i.comment}`.toLowerCase().includes(f)).map((i) => {
-    const up = i.disabled ? ['bg-slate-600', 'disabled'] : i.running ? ['bg-emerald-400', 'up'] : ['bg-rose-500', 'down'];
-    return `<tr class="hover:bg-slate-800/40"><td class="px-4 py-2"><span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full ${up[0]}"></span>${up[1]}</span></td>
-      <td class="px-4 py-2 font-medium break-all">${esc(i.name)}</td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(i.type)}</td>
-      <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.rxbps)}</td><td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.txbps)}</td>
-      <td class="px-4 py-2 text-right hidden md:table-cell ${i.errors ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.errors)}</td>
-      <td class="px-4 py-2 text-right hidden md:table-cell ${i.drops ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.drops)}</td>
-      <td class="px-4 py-2 text-slate-500 hidden lg:table-cell">${esc(i.comment)}</td></tr>`;
+    const up = i.disabled ? ['bg-slate-600', 'off'] : i.running ? ['bg-emerald-400', 'up'] : ['bg-rose-500', 'down'];
+    return `<tr class="hover:bg-slate-800/40"><td class="px-2.5 sm:px-4 py-2 whitespace-nowrap"><span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full shrink-0 ${up[0]}"></span><span>${up[1]}</span></span></td>
+      <td class="px-2.5 sm:px-4 py-2 font-medium"><div class="truncate max-w-[9.5rem] sm:max-w-none">${esc(i.name)}</div><div class="sm:hidden text-[11px] text-slate-500 truncate max-w-[9.5rem]">${esc(i.type)}${i.comment ? ' · ' + esc(i.comment) : ''}</div></td><td class="px-3 sm:px-4 py-2 text-slate-400 hidden sm:table-cell whitespace-nowrap">${esc(i.type)}</td>
+      <td class="px-2.5 sm:px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.rxbps)}</td><td class="px-2.5 sm:px-4 py-2 text-right tabular-nums whitespace-nowrap">${fmtBps(i.txbps)}</td>
+      <td class="px-3 sm:px-4 py-2 text-right hidden md:table-cell ${i.errors ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.errors)}</td>
+      <td class="px-3 sm:px-4 py-2 text-right hidden md:table-cell ${i.drops ? 'text-amber-400' : 'text-slate-500'}">${fmtN(i.drops)}</td>
+      <td class="px-3 sm:px-4 py-2 text-slate-500 hidden lg:table-cell">${esc(i.comment)}</td></tr>`;
   }).join('');
 }
 $('ifFilter').value = ST.ifFilter || '';
@@ -983,9 +992,9 @@ async function loadPppoe() {
   if (!d.rows.length && page > 1) { page = 1; return loadPppoe(); }
   $('pTotal').textContent = `(${fmtN(d.total)})`;
   $('pBody').innerHTML = d.rows.map((r) => `<tr class="hover:bg-slate-800/40">
-    <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${r.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.status}</span></td>
-    <td class="px-4 py-2 font-medium break-all"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left">${esc(r.name)}</button><div class="sm:hidden text-xs text-slate-500">${esc(r.profile)} · ${esc(r.uptime || '-')}</div></td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(r.profile)}</td>
-    <td class="px-4 py-2 tabular-nums">${esc(r.address || '-')}</td><td class="px-4 py-2 font-mono text-xs text-slate-400 hidden md:table-cell">${esc(r.mac || '-')}</td><td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(r.uptime || '-')}</td></tr>`).join('');
+    <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[11px] sm:text-xs font-medium ${r.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.status}</span></td>
+    <td class="px-2.5 sm:px-4 py-2 font-medium"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left truncate max-w-[9.5rem] sm:max-w-none block">${esc(r.name)}</button><div class="sm:hidden text-[11px] text-slate-500 truncate max-w-[9.5rem]">${esc(r.profile)} · ${esc(r.uptime || '-')}</div></td><td class="px-3 sm:px-4 py-2 text-slate-400 hidden sm:table-cell whitespace-nowrap">${esc(r.profile)}</td>
+    <td class="px-2.5 sm:px-4 py-2 tabular-nums whitespace-nowrap text-xs sm:text-sm">${esc(r.address || '-')}</td><td class="px-3 sm:px-4 py-2 font-mono text-xs text-slate-400 hidden md:table-cell whitespace-nowrap">${esc(r.mac || '-')}</td><td class="px-3 sm:px-4 py-2 text-slate-400 hidden sm:table-cell whitespace-nowrap">${esc(r.uptime || '-')}</td></tr>`).join('');
   const pages = Math.max(1, Math.ceil(d.total / d.size));
   $('pPage').textContent = `Halaman ${d.page} / ${pages}`;
   $('pPrev').disabled = page <= 1; $('pNext').disabled = page >= pages;
@@ -1004,9 +1013,9 @@ function drawEvHead() {
   const thBtn = (key, label, align = 'text-left') => {
     const active = s === key || (key === 'last_down' && s === 'oldest_down');
     const arrow = s === key ? ' ▼' : (key === 'last_down' && s === 'oldest_down') ? ' ▲' : '';
-    return `<th class="${align} px-4 py-2"><button type="button" data-ev-sort="${key}" class="hover:text-slate-200 transition ${active ? 'text-sky-400 font-semibold' : ''}">${label}${arrow}</button></th>`;
+    return `<th class="${align} px-2.5 sm:px-4 py-2 whitespace-nowrap"><button type="button" data-ev-sort="${key}" class="hover:text-slate-200 transition ${active ? 'text-sky-400 font-semibold' : ''}">${label}${arrow}</button></th>`;
   };
-  $('evHead').innerHTML = `<tr>${thBtn('name', 'Username')}${thBtn('downs', 'Putus', 'text-right')}${thBtn('last_down', 'Terakhir putus')}<th class="text-left px-4 py-2 hidden sm:table-cell">Konek kembali</th><th class="text-left px-4 py-2">Status</th></tr>`;
+  $('evHead').innerHTML = `<tr>${thBtn('name', 'Username')}${thBtn('downs', 'Putus', 'text-right')}${thBtn('last_down', 'Terakhir putus')}<th class="text-left px-3 sm:px-4 py-2 hidden sm:table-cell whitespace-nowrap">Konek kembali</th><th class="text-left px-2.5 sm:px-4 py-2 whitespace-nowrap">Status</th></tr>`;
 }
 $('evHead').onclick = (e) => {
   const b = e.target.closest('[data-ev-sort]');
@@ -1038,11 +1047,11 @@ async function loadEvents() {
   const empty = `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Tidak ada data</td></tr>`;
     $('evBody').innerHTML = d.rows.length ? d.rows.map((r) => {
       const back = r.lastUp && r.lastUp >= r.lastDown ? r.lastUp : null;
-      return `<tr class="hover:bg-slate-800/40"><td class="px-4 py-2 font-medium break-all"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left">${esc(r.name)}</button><div class="sm:hidden text-xs text-slate-500">kembali: ${back ? fmtDT(back) : '-'}</div></td>
-        <td class="px-4 py-2 text-right"><span class="px-2 py-0.5 rounded text-xs font-semibold ${r.downs >= 5 ? 'bg-rose-500/30 text-rose-200' : 'bg-amber-500/20 text-amber-300'}">${r.downs}×</span></td>
-        <td class="px-4 py-2 whitespace-nowrap text-slate-400">${fmtDT(r.lastDown)}</td>
-        <td class="px-4 py-2 whitespace-nowrap text-slate-400 hidden sm:table-cell">${back ? fmtDT(back) : '-'}</td>
-        <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs ${r.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.online ? 'online' : 'offline'}</span></td></tr>`;
+      return `<tr class="hover:bg-slate-800/40"><td class="px-2.5 sm:px-4 py-2 font-medium"><button data-user="${esc(r.name)}" class="text-sky-400 hover:underline text-left truncate max-w-[8.5rem] sm:max-w-none block">${esc(r.name)}</button><div class="sm:hidden text-[11px] text-slate-500 whitespace-nowrap">kembali: ${back ? fmtDT(back) : '-'}</div></td>
+        <td class="px-2.5 sm:px-4 py-2 text-right whitespace-nowrap"><span class="px-1.5 sm:px-2 py-0.5 rounded text-[11px] sm:text-xs font-semibold ${r.downs >= 5 ? 'bg-rose-500/30 text-rose-200' : 'bg-amber-500/20 text-amber-300'}">${r.downs}×</span></td>
+        <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap text-slate-400 text-[11px] sm:text-sm tabular-nums">${fmtDT(r.lastDown)}</td>
+        <td class="px-3 sm:px-4 py-2 whitespace-nowrap text-slate-400 hidden sm:table-cell tabular-nums">${back ? fmtDT(back) : '-'}</td>
+        <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap"><span class="px-1.5 sm:px-2 py-0.5 rounded text-[11px] sm:text-xs ${r.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.online ? 'online' : 'offline'}</span></td></tr>`;
     }).join('') : empty;
   const pages = Math.max(1, Math.ceil(d.total / 50));
   $('evPage').textContent = `Halaman ${evPage} / ${pages}`; $('evPrev').disabled = evPage <= 1; $('evNext').disabled = evPage >= pages;
@@ -1072,8 +1081,7 @@ function showTab() {
   const isNet = mainTab === 'network';
   $('kpiSection').classList.toggle('hidden', !isNet);
   $('netTabs').classList.toggle('hidden', !isNet);
-  $('netTabs').classList.toggle('grid', isNet);
-  $('netTabs').classList.toggle('sm:flex', isNet);
+  $('netTabs').classList.toggle('flex', isNet);
   document.querySelectorAll('[data-tab]').forEach((el) => el.classList.toggle('hidden', el.dataset.tab !== tab));
   if (tab === 'grafik') [cTraffic, cOnline, cCpu, cIf].forEach((c) => c.resize());
   if (tab === 'pop') renderPops();
@@ -1241,15 +1249,15 @@ function fitScroll5(bodyId, headId, scrollId, split = 1) {
   const scrollEl = $(scrollId), headEl = $(headId), bodyEl = $(bodyId);
   if (!scrollEl || !headEl || !bodyEl) return;
   const trs = [...bodyEl.querySelectorAll('tr')];
-  const isPortraitMonitor = window.innerHeight >= 900 && window.innerHeight > window.innerWidth;
+  const isPortraitMonitor = window.innerWidth >= 768 && window.innerHeight >= 900 && window.innerHeight > window.innerWidth;
   if (isPortraitMonitor) {
-    // On portrait monitor, expand table container dynamically to fill vertical screen space
+    // On portrait desktop monitor, expand table container dynamically to fill vertical screen space
     const rect = scrollEl.getBoundingClientRect();
     const avail = Math.floor((window.innerHeight - rect.top - 110) / split);
     scrollEl.style.maxHeight = Math.max(260, avail) + 'px';
     return;
   }
-  const visibleRows = window.innerHeight >= 1000 ? Math.max(5, Math.floor((window.innerHeight - 520) / (42 * split))) : 5;
+  const visibleRows = window.innerWidth >= 768 && window.innerHeight >= 1000 ? Math.max(5, Math.floor((window.innerHeight - 520) / (42 * split))) : 5;
   if (trs.length > visibleRows && headEl.offsetHeight) {
     const h = headEl.offsetHeight + trs.slice(0, visibleRows).reduce((s, r) => s + r.offsetHeight, 0) + 2;
     scrollEl.style.maxHeight = h + 'px';
@@ -1307,27 +1315,27 @@ function renderPops() {
   });
 
   $('popBody').innerHTML = filtered.length ? filtered.map((p) => {
-    let badge = '<span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400">mengecek…</span>';
-    if (!p.enabled) badge = '<span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-500">nonaktif</span>';
-    else if (p.status === 'up') badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300"><span class="h-2 w-2 rounded-full bg-emerald-400"></span>UP</span>';
-    else if (p.status === 'down') badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold bg-rose-500/30 text-rose-200 animate-pulse"><span class="h-2 w-2 rounded-full bg-rose-500"></span>DOWN</span>';
+    let badge = '<span class="px-2 py-0.5 rounded text-[11px] sm:text-xs bg-slate-800 text-slate-400">…</span>';
+    if (!p.enabled) badge = '<span class="px-2 py-0.5 rounded text-[11px] sm:text-xs bg-slate-800 text-slate-500">off</span>';
+    else if (p.status === 'up') badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] sm:text-xs font-semibold bg-emerald-500/20 text-emerald-300"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>UP</span>';
+    else if (p.status === 'down') badge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] sm:text-xs font-bold bg-rose-500/30 text-rose-200 animate-pulse"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>DOWN</span>';
 
-    const rttText = !p.enabled ? '-' : p.status === 'up' ? `${p.rttMs != null ? p.rttMs + ' ms' : 'OK'}${p.lossPct ? ` (${p.lossPct}% loss)` : ''}` : p.status === 'down' ? 'Timeout (100% loss)' : '…';
+    const rttText = !p.enabled ? '-' : p.status === 'up' ? `${p.rttMs != null ? p.rttMs + ' ms' : 'OK'}${p.lossPct ? ` (${p.lossPct}%)` : ''}` : p.status === 'down' ? 'Timeout' : '…';
     const durText = p.status === 'down' && p.downSince ? `<span class="text-rose-400 font-medium">Down ${fmtDur(Date.now() - p.downSince)}</span>` : p.lastChange ? `Sejak ${fmtDT(p.lastChange)}` : '';
     const infoText = [p.notes, durText].filter(Boolean).join(' · ');
 
     return `<tr class="hover:bg-slate-800/40 ${p.enabled && p.status === 'down' ? 'bg-rose-950/30' : ''}">
-      <td class="px-4 py-2 whitespace-nowrap">${badge}</td>
-      <td class="px-4 py-2 font-medium break-all">${esc(p.name)}<div class="sm:hidden text-xs text-slate-500">${esc(p.location || '-')}</div></td>
-      <td class="px-4 py-2 font-mono text-xs sm:text-sm text-sky-300 whitespace-nowrap">${esc(p.ip)}</td>
-      <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap ${p.status === 'down' ? 'text-rose-400 font-semibold' : 'text-slate-300'}">${rttText}</td>
-      <td class="px-4 py-2 text-slate-400 hidden sm:table-cell">${esc(p.location || '-')}</td>
-      <td class="px-4 py-2 text-slate-400 text-xs hidden md:table-cell">${infoText || '-'}</td>
-      <td class="px-4 py-2 text-right whitespace-nowrap">
+      <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap">${badge}</td>
+      <td class="px-2.5 sm:px-4 py-2 font-medium"><div class="truncate max-w-[8.5rem] sm:max-w-none">${esc(p.name)}</div><div class="sm:hidden text-[11px] text-slate-500 truncate max-w-[8.5rem]"><span class="font-mono text-sky-400">${esc(p.ip)}</span>${p.location ? ' · ' + esc(p.location) : ''}</div></td>
+      <td class="px-3 sm:px-4 py-2 font-mono text-xs sm:text-sm text-sky-300 whitespace-nowrap hidden sm:table-cell">${esc(p.ip)}</td>
+      <td class="px-2.5 sm:px-4 py-2 text-right tabular-nums whitespace-nowrap ${p.status === 'down' ? 'text-rose-400 font-semibold' : 'text-slate-300'}">${rttText}</td>
+      <td class="px-3 sm:px-4 py-2 text-slate-400 hidden md:table-cell">${esc(p.location || '-')}</td>
+      <td class="px-3 sm:px-4 py-2 text-slate-400 text-xs hidden lg:table-cell">${infoText || '-'}</td>
+      <td class="px-2.5 sm:px-4 py-2 text-right whitespace-nowrap">
         <div class="inline-flex gap-1 text-xs">
-          <button data-pop-act="edit" data-id="${p.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
-          <button data-pop-act="toggle" data-id="${p.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700">${p.enabled ? 'Off' : 'On'}</button>
-          <button data-pop-act="del" data-id="${p.id}" class="px-2.5 py-1 rounded bg-rose-600/70 hover:bg-rose-600 text-white">Hapus</button>
+          <button data-pop-act="edit" data-id="${p.id}" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Edit</button>
+          <button data-pop-act="toggle" data-id="${p.id}" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">${p.enabled ? 'Off' : 'On'}</button>
+          <button data-pop-act="del" data-id="${p.id}" class="px-2 py-1 rounded bg-rose-600/70 hover:bg-rose-600 text-white">Hapus</button>
         </div>
       </td>
     </tr>`;
@@ -1339,11 +1347,11 @@ function renderPops() {
 function renderPopEvents() {
   $('popEvCount').textContent = `(${fmtN(popEvents.length)})`;
   $('popEvBody').innerHTML = popEvents.length ? popEvents.map((e) => `<tr class="hover:bg-slate-800/40">
-    <td class="px-4 py-2 whitespace-nowrap text-slate-400 tabular-nums">${fmtDT(e.ts)}</td>
-    <td class="px-4 py-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-xs font-semibold ${e.event === 'up' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-200'}">${e.event === 'up' ? 'UP (Nyambung)' : 'DOWN (Putus)'}</span></td>
-    <td class="px-4 py-2 font-medium break-all">${esc(e.name)}</td>
-    <td class="px-4 py-2 font-mono text-xs text-sky-300 whitespace-nowrap">${esc(e.ip)}</td>
-    <td class="px-4 py-2 text-xs text-slate-400 hidden sm:table-cell">${esc(e.detail || '-')}</td>
+    <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap text-slate-400 tabular-nums text-[11px] sm:text-sm">${fmtDT(e.ts)}</td>
+    <td class="px-2.5 sm:px-4 py-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[11px] sm:text-xs font-semibold ${e.event === 'up' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-200'}">${e.event === 'up' ? 'UP' : 'DOWN'}</span></td>
+    <td class="px-2.5 sm:px-4 py-2 font-medium"><div class="truncate max-w-[9rem] sm:max-w-none">${esc(e.name)}</div><div class="sm:hidden text-[11px] text-slate-500 font-mono truncate max-w-[9rem]">${esc(e.ip)}${e.detail ? ' · ' + esc(e.detail) : ''}</div></td>
+    <td class="px-3 sm:px-4 py-2 font-mono text-xs text-sky-300 whitespace-nowrap hidden sm:table-cell">${esc(e.ip)}</td>
+    <td class="px-3 sm:px-4 py-2 text-xs text-slate-400 hidden md:table-cell">${esc(e.detail || '-')}</td>
   </tr>`).join('') : `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Belum ada riwayat putus / nyambung POP</td></tr>`;
   fitScroll5('popEvBody', 'popEvHead', 'popEvScroll', 2);
 }
