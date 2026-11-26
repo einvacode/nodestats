@@ -298,31 +298,31 @@ class Collector {
     const upChanges = changes.filter((c) => c.status === 'up');
 
     if (downChanges.length && tg.popDown) {
-      const listStr = downChanges.map((c) => `<b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>${c.pop.location ? ` - ${escTg(c.pop.location)}` : ''})`).join(', ');
+      const listStr = downChanges.map((c) => `<b>${escTg(c.pop.name)}</b>`).join(', ');
       const otherDowns = curDowns.filter((d) => !downChanges.some((c) => c.pop.id === d.id));
       let msg = `🚨 <b>POP TIDAK KONEK (${downChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Total POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
         + `<b>POP Baru Down (${downChanges.length}):</b>\n${listStr}`;
       if (otherDowns.length) {
-        const otherStr = otherDowns.slice(0, 50).map((d) => `<b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join(', ');
+        const otherStr = otherDowns.slice(0, 80).map((d) => `<b>${escTg(d.name)}</b>`).join(', ');
         msg += `\n\n<b>POP Lain Masih Tidak Konek (${otherDowns.length}):</b>\n${otherStr}`
-          + (otherDowns.length > 50 ? `, <i>...dan ${otherDowns.length - 50} lainnya</i>` : '');
+          + (otherDowns.length > 80 ? `, <i>...dan ${otherDowns.length - 80} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
     }
 
     if (upChanges.length && tg.popUp) {
-      const listStr = upChanges.map((c) => `<b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>${c.prevDownSince ? ` - down ${fmtDurTg(c.now - c.prevDownSince)}` : ''})`).join(', ');
+      const listStr = upChanges.map((c) => `<b>${escTg(c.pop.name)}</b>`).join(', ');
       let msg = `✅ <b>POP KEMBALI KONEK (${upChanges.length} POP)</b>\n`
         + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
         + `⚠️ Sisa POP Tidak Konek: <b>${curDowns.length} POP</b>\n\n`
         + `<b>POP Kembali Konek (${upChanges.length}):</b>\n${listStr}`;
       if (curDowns.length) {
-        const downStr = curDowns.slice(0, 50).map((d) => `<b>${escTg(d.name)}</b> (<code>${escTg(d.ip)}</code>)`).join(', ');
+        const downStr = curDowns.slice(0, 80).map((d) => `<b>${escTg(d.name)}</b>`).join(', ');
         msg += `\n\n<b>POP Masih Tidak Konek (${curDowns.length}):</b>\n${downStr}`
-          + (curDowns.length > 50 ? `, <i>...dan ${curDowns.length - 50} lainnya</i>` : '');
+          + (curDowns.length > 80 ? `, <i>...dan ${curDowns.length - 80} lainnya</i>` : '');
       }
       msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
       queueTelegram(msg);
@@ -713,8 +713,8 @@ http.createServer(async (req, res) => {
           + `🔻 PPPoE Tidak Konek: <b>${offlineUsers.length} User</b>`;
         if (popDowns.length) {
           statusSummary += `\n\n🚨 <b>POP Tidak Konek (${popDowns.length}):</b>\n`
-            + popDowns.slice(0, 50).map((p) => `<b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)`).join(', ');
-          if (popDowns.length > 50) statusSummary += `, <i>...dan ${popDowns.length - 50} lainnya</i>`;
+            + popDowns.slice(0, 80).map((p) => `<b>${escTg(p.name)}</b>`).join(', ');
+          if (popDowns.length > 80) statusSummary += `, <i>...dan ${popDowns.length - 80} lainnya</i>`;
         }
         if (offlineUsers.length) {
           statusSummary += `\n\n🔻 <b>PPPoE Tidak Konek (${offlineUsers.length}):</b>\n`
