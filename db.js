@@ -81,6 +81,17 @@ const DEFAULT_SETTINGS = {
   footer: '',
   logo: '',
 };
+const DEFAULT_TG_SETTINGS = {
+  tgEnabled: '0',
+  tgBotToken: '',
+  tgChatId: '',
+  tgPopDown: '1',
+  tgPopUp: '1',
+  tgPppoeDown: '1',
+  tgPppoeUp: '0',
+  tgPppoeMinDown: '1',
+  tgRouterDown: '1',
+};
 const upSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
 function getSettings() {
   const out = { ...DEFAULT_SETTINGS };
@@ -100,6 +111,37 @@ function setSettings(obj) {
     }
   });
   return getSettings();
+}
+function getTelegramSettings() {
+  const out = { ...DEFAULT_TG_SETTINGS };
+  for (const r of db.prepare('SELECT key, value FROM settings').all()) {
+    if (r.key in DEFAULT_TG_SETTINGS) out[r.key] = r.value;
+  }
+  return {
+    enabled: out.tgEnabled === '1',
+    botToken: out.tgBotToken,
+    chatId: out.tgChatId,
+    popDown: out.tgPopDown !== '0',
+    popUp: out.tgPopUp !== '0',
+    pppoeDown: out.tgPppoeDown !== '0',
+    pppoeUp: out.tgPppoeUp === '1',
+    pppoeMinDown: Math.max(1, +out.tgPppoeMinDown || 1),
+    routerDown: out.tgRouterDown !== '0',
+  };
+}
+function setTelegramSettings(obj) {
+  tx(() => {
+    if (obj.enabled !== undefined) upSetting.run('tgEnabled', obj.enabled ? '1' : '0');
+    if (obj.botToken !== undefined) upSetting.run('tgBotToken', String(obj.botToken ?? '').trim().slice(0, 200));
+    if (obj.chatId !== undefined) upSetting.run('tgChatId', String(obj.chatId ?? '').trim().slice(0, 200));
+    if (obj.popDown !== undefined) upSetting.run('tgPopDown', obj.popDown ? '1' : '0');
+    if (obj.popUp !== undefined) upSetting.run('tgPopUp', obj.popUp ? '1' : '0');
+    if (obj.pppoeDown !== undefined) upSetting.run('tgPppoeDown', obj.pppoeDown ? '1' : '0');
+    if (obj.pppoeUp !== undefined) upSetting.run('tgPppoeUp', obj.pppoeUp ? '1' : '0');
+    if (obj.pppoeMinDown !== undefined) upSetting.run('tgPppoeMinDown', String(Math.max(1, Math.min(5000, +obj.pppoeMinDown || 1))));
+    if (obj.routerDown !== undefined) upSetting.run('tgRouterDown', obj.routerDown ? '1' : '0');
+  });
+  return getTelegramSettings();
 }
 
 // ---- routers CRUD ----
@@ -326,7 +368,8 @@ process.on('SIGTERM', () => { flushAll(true); process.exit(0); });
 process.on('SIGINT', () => { flushAll(true); process.exit(0); });
 
 module.exports = {
-  getSettings, setSettings, listRouters, getRouter, addRouter, updateRouter, deleteRouter,
+  getSettings, setSettings, getTelegramSettings, setTelegramSettings,
+  listRouters, getRouter, addRouter, updateRouter, deleteRouter,
   listPops, getPop, addPop, updatePop, deletePop, addPopEvent, listPopEvents,
   listUsers, getUser, verifyUser, addUser, updateUser, deleteUser, ensureDefaultUsers, getAuthSecret,
   record, forget, addEvents, history, flaps, userEvents, SAMPLE_SEC, RETENTION_DAYS,

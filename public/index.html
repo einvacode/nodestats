@@ -427,6 +427,94 @@
     </div>
   </section>
 
+  <!-- Notifikasi Telegram Bot -->
+  <section class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-4">
+    <div class="flex items-start justify-between gap-2 flex-wrap">
+      <div>
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-semibold">Notifikasi Telegram Bot</h3>
+          <span id="tgStatusBadge" class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-800 text-slate-400">Nonaktif</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Kirim laporan otomatis ke grup / chat Telegram saat POP Down/Up atau pelanggan PPPoE putus beserta jumlah dan rinciannya.</p>
+      </div>
+    </div>
+
+    <form id="tgForm" class="space-y-4 text-sm">
+      <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-2 rounded-xl bg-slate-950/60 border border-slate-800">
+        <input id="tgEnabled" type="checkbox" class="h-4 w-4 rounded accent-sky-500">
+        <span class="font-medium text-slate-200">Aktifkan Notifikasi Telegram</span>
+      </label>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Bot Token (dari @BotFather) *</span>
+          <input id="tgBotToken" type="password" autocomplete="off" placeholder="mis. 123456789:ABCdefGHIjklMNOpqrSTUvwxYZ" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs sm:text-sm focus:outline-none focus:border-sky-500">
+          <span class="block text-[11px] text-slate-500">Buat bot di Telegram melalui <b>@BotFather</b> lalu salin token API-nya.</span>
+        </label>
+        <label class="space-y-1">
+          <span class="text-xs text-slate-400">Chat ID / Group ID *</span>
+          <input id="tgChatId" placeholder="mis. -1001234567890 atau 123456789" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs sm:text-sm focus:outline-none focus:border-sky-500">
+          <span class="block text-[11px] text-slate-500">Bisa diisi lebih dari satu Chat ID (pisahkan dengan koma). Untuk grup, awali dengan tanda minus (mis. <code>-100...</code>).</span>
+        </label>
+      </div>
+
+      <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-4 space-y-3">
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-sky-400">Jenis Notifikasi yang Dikirim</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input id="tgPopDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
+            <div>
+              <div class="font-medium text-slate-200">🚨 POP Down (Putus)</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; daftar nama POP, IP, lokasi yang tidak merespons ping</div>
+            </div>
+          </label>
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input id="tgPopUp" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
+            <div>
+              <div class="font-medium text-slate-200">✅ POP Up (Kembali Online)</div>
+              <div class="text-xs text-slate-500">Notifikasi saat POP kembali menyala beserta durasi putusnya</div>
+            </div>
+          </label>
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input id="tgPppoeDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
+            <div>
+              <div class="font-medium text-slate-200">🔻 Pelanggan PPPoE Down</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; rincian username, paket/profile, IP, dan uptime user yang putus</div>
+            </div>
+          </label>
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input id="tgPppoeUp" type="checkbox" class="mt-0.5 h-4 w-4 rounded accent-sky-500">
+            <div>
+              <div class="font-medium text-slate-200">🟢 Pelanggan PPPoE Konek Kembali</div>
+              <div class="text-xs text-slate-500">Jumlah &amp; rincian username PPPoE yang baru terhubung kembali</div>
+            </div>
+          </label>
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input id="tgRouterDown" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded accent-sky-500">
+            <div>
+              <div class="font-medium text-slate-200">🖥 Router MikroTik Terputus / Pulih</div>
+              <div class="text-xs text-slate-500">Notifikasi jika koneksi API ke router MikroTik gagal / kembali normal</div>
+            </div>
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs text-slate-300 font-medium block">Minimal PPPoE Putus per Notifikasi</span>
+            <div class="flex items-center gap-2">
+              <input id="tgPppoeMinDown" type="number" min="1" max="5000" value="1" class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:border-sky-500">
+              <span class="text-xs text-slate-400">user putus bersamaan</span>
+            </div>
+            <span class="block text-[11px] text-slate-500">Isi <b>1</b> untuk setiap user putus, atau mis. <b>5</b> hanya jika putus massal ≥5 user.</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5 flex-wrap pt-1">
+        <button type="submit" id="tgSaveBtn" class="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Simpan Pengaturan Telegram</button>
+        <button type="button" id="tgTestBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm">📨 Tes Kirim Pesan</button>
+        <span id="tgMsg" class="text-sm"></span>
+      </div>
+    </form>
+  </section>
+
   <!-- Manajemen ID Admin & NOC (Khusus Admin) -->
   <section id="userMgrSection" class="rounded-xl bg-slate-900 border border-slate-800 p-4 sm:p-6 space-y-4">
     <div class="flex items-start justify-between gap-2 flex-wrap">
@@ -1229,6 +1317,83 @@ $('sOpenMgr').onclick = () => openMgr();
 $('sOpenUpd').onclick = () => $('updBtn').click();
 loadSettings();
 
+// ---- Telegram Notification Settings ----
+function updateTgBadge(en) {
+  const b = $('tgStatusBadge');
+  if (!b) return;
+  b.textContent = en ? '● Aktif' : 'Nonaktif';
+  b.className = 'px-2 py-0.5 rounded text-xs font-semibold ' + (en ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400');
+}
+function fillTelegramForm(t) {
+  $('tgEnabled').checked = !!t.enabled;
+  $('tgBotToken').value = t.botToken || '';
+  $('tgChatId').value = t.chatId || '';
+  $('tgPopDown').checked = t.popDown !== false;
+  $('tgPopUp').checked = t.popUp !== false;
+  $('tgPppoeDown').checked = t.pppoeDown !== false;
+  $('tgPppoeUp').checked = !!t.pppoeUp;
+  $('tgRouterDown').checked = t.routerDown !== false;
+  $('tgPppoeMinDown').value = t.pppoeMinDown || 1;
+  updateTgBadge(!!t.enabled);
+}
+async function loadTelegramSettings() {
+  if (!currentUser) return;
+  try {
+    const r = await fetch('/api/telegram');
+    if (r.ok) fillTelegramForm(await r.json());
+  } catch (e) { console.error(e); }
+}
+$('tgForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('tgMsg').textContent = 'Menyimpan…'; $('tgMsg').className = 'text-sm text-slate-400';
+  try {
+    const body = {
+      enabled: $('tgEnabled').checked,
+      botToken: $('tgBotToken').value.trim(),
+      chatId: $('tgChatId').value.trim(),
+      popDown: $('tgPopDown').checked,
+      popUp: $('tgPopUp').checked,
+      pppoeDown: $('tgPppoeDown').checked,
+      pppoeUp: $('tgPppoeUp').checked,
+      routerDown: $('tgRouterDown').checked,
+      pppoeMinDown: +$('tgPppoeMinDown').value || 1,
+    };
+    const r = await fetch('/api/telegram', { method: 'POST', body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) { $('tgMsg').textContent = d.error; $('tgMsg').className = 'text-sm text-rose-400'; return; }
+    fillTelegramForm(d);
+    $('tgMsg').textContent = '✓ Pengaturan Telegram tersimpan'; $('tgMsg').className = 'text-sm text-emerald-400';
+    setTimeout(() => { if ($('tgMsg').textContent.startsWith('✓')) $('tgMsg').textContent = ''; }, 3000);
+  } catch (err) {
+    $('tgMsg').textContent = 'Gagal: ' + err.message; $('tgMsg').className = 'text-sm text-rose-400';
+  }
+};
+$('tgTestBtn').onclick = async () => {
+  $('tgTestBtn').disabled = true;
+  $('tgMsg').textContent = 'Mengirim pesan tes ke Telegram…'; $('tgMsg').className = 'text-sm text-slate-400';
+  try {
+    const r = await rq('/api/telegram/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        botToken: $('tgBotToken').value.trim(),
+        chatId: $('tgChatId').value.trim(),
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      $('tgMsg').textContent = d.error || 'Gagal mengirim pesan tes';
+      $('tgMsg').className = 'text-sm text-rose-400';
+    } else {
+      $('tgMsg').textContent = '✓ Pesan tes berhasil dikirim ke Telegram!';
+      $('tgMsg').className = 'text-sm text-emerald-400';
+    }
+  } catch (err) {
+    $('tgMsg').textContent = 'Gagal: ' + err.message;
+    $('tgMsg').className = 'text-sm text-rose-400';
+  }
+  $('tgTestBtn').disabled = false;
+};
+
 // ---- Auth & Role Management (Admin vs NOC) ----
 let usersList = [];
 function showLoginScreen() {
@@ -1275,6 +1440,7 @@ function applyRolePermissions() {
   $('updBtn').classList.toggle('hidden', !isAdmin);
   $('updBtn').classList.toggle('grid', isAdmin);
   $('sOpenUpd').classList.toggle('hidden', !isAdmin);
+  if (currentUser) loadTelegramSettings();
   if (isAdmin) loadUsers();
 }
 

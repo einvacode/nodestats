@@ -27,6 +27,73 @@ const DB = require('./db');
 const UPD = require('./update');
 const HIST_MAX = 360; // 360 * 10s = 1 hour
 
+// ---- Telegram Bot Notifier ----
+const escTg = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmtTimeTg = (ms = Date.now()) => new Date(ms).toLocaleString('id-ID', {
+  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const fmtDurTg = (ms) => {
+  let s = Math.max(0, Math.round(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  s %= 60;
+  return d ? `${d}h ${h}j ${m}m` : h ? `${h}j ${m}m` : m ? `${m}m ${s}d` : `${s}d`;
+};
+
+function tgPostOne(botToken, chatId, text) {
+  return new Promise((resolve, reject) => {
+    const payload = Buffer.from(JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    }));
+    const req = https.request({
+      host: 'api.telegram.org',
+      port: 443,
+      path: `/bot${botToken}/sendMessage`,
+      method: 'POST',
+      timeout: 12000,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': payload.length },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString();
+        try {
+          const j = JSON.parse(body);
+          if (!j.ok) return reject(new Error(j.description || `HTTP ${res.statusCode}`));
+          resolve(j);
+        } catch {
+          if (res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode}: ${body.slice(0, 160)}`));
+          resolve({});
+        }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Telegram API timeout')));
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function sendTelegramMessage(text, overrideCfg = null) {
+  const tg = overrideCfg || DB.getTelegramSettings();
+  if (!overrideCfg && !tg.enabled) return { ok: false, skipped: true };
+  const token = String(tg.botToken || '').trim();
+  const rawChats = String(tg.chatId || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  if (!token || !rawChats.length) throw new Error('Bot Token dan Chat ID wajib diisi');
+  const results = [];
+  for (const cid of rawChats) {
+    results.push(await tgPostOne(token, cid, text));
+  }
+  return { ok: true, sent: results.length };
+}
+
+function queueTelegram(text) {
+  sendTelegramMessage(text).catch((e) => console.error('[telegram]', e.message));
+}
+
+
 // ---- RouterOS REST ----
 function rosReq(r, method, p, payload, timeout = 30000) {
   return new Promise((resolve, reject) => {
@@ -129,9 +196,10 @@ class Collector {
     this.demo = row.host === 'demo' ? makeDemo(row.id % 2 ? 3200 : 900) : null;
     this.updated = 0; this.error = null; this.resource = null; this.health = []; this.identity = '';
     this.secrets = []; this.secretsUpdated = 0; this.active = []; this.ifaces = [];
-    this.prevIf = new Map(); this.prevActive = null;
+    this.prevIf = new Map(); this.prevActive = null; this.prevActiveMap = null;
     this.hist = { t: [], online: [], cpu: [], rx: [], tx: [] }; this.ifHist = new Map();
     this.popStates = new Map(); this.pollingPops = false;
+    this.routerDownNotified = false; this.failCount = 0;
   }
   start() { this.stopped = false; this.pollSlow().then(() => { this.pollFast(); this.pollPopsLoop(); }); }
   stop() { this.stopped = true; this.timers.forEach(clearTimeout); this.timers = []; DB.forget(this.id); }
@@ -140,7 +208,7 @@ class Collector {
   async pollOnePop(p) {
     if (!p.enabled) {
       this.popStates.set(p.id, { status: 'disabled', rttMs: null, lossPct: 0, lastCheck: Date.now(), lastChange: null, downSince: null });
-      return;
+      return null;
     }
     const prev = this.popStates.get(p.id);
     const now = Date.now();
@@ -148,15 +216,18 @@ class Collector {
       const res = await pingViaRouter(this.r, p.ip, !!this.demo);
       const status = res.up ? 'up' : 'down';
       const changed = prev && (prev.status === 'up' || prev.status === 'down') && prev.status !== status;
+      const prevDownSince = prev?.downSince || prev?.lastChange || null;
       const lastChange = changed ? now : (prev?.lastChange || now);
       const downSince = status === 'down' ? (prev?.status === 'down' ? prev.downSince : now) : null;
       this.popStates.set(p.id, { status, rttMs: res.rttMs, lossPct: res.lossPct, lastCheck: now, lastChange, downSince, error: null });
       if (changed || (!prev && status === 'down')) {
+        const detail = status === 'up' ? (res.rttMs != null ? `Reply ${res.rttMs} ms` : 'Reply OK') : 'Request timeout (100% loss)';
         DB.addPopEvent({
           pop_id: p.id, router_id: this.id, ts: Math.floor(now / 1000),
           name: p.name, ip: p.ip, event: status,
-          detail: status === 'up' ? (res.rttMs != null ? `Reply ${res.rttMs} ms` : 'Reply OK') : 'Request timeout (100% loss)',
+          detail,
         });
+        return { pop: p, status, rttMs: res.rttMs, detail, prevDownSince, now };
       }
     } catch (e) {
       this.popStates.set(p.id, {
@@ -164,16 +235,74 @@ class Collector {
         lastCheck: now, lastChange: prev?.lastChange || now, downSince: prev?.downSince || null, error: e.message,
       });
     }
+    return null;
+  }
+  notifyPopChanges(changes) {
+    if (!changes.length) return;
+    const tg = DB.getTelegramSettings();
+    if (!tg.enabled) return;
+    const brand = DB.getSettings().companyName || 'NodeStats';
+    const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
+    const allPops = this.popsList().filter((x) => x.enabled);
+    const curDowns = allPops.filter((x) => x.status === 'down');
+    const curUps = allPops.filter((x) => x.status === 'up');
+
+    const downChanges = changes.filter((c) => c.status === 'down');
+    const upChanges = changes.filter((c) => c.status === 'up');
+
+    if (downChanges.length && tg.popDown) {
+      const lines = downChanges.map((c, idx) => {
+        const loc = c.pop.location ? ` · 📍 ${escTg(c.pop.location)}` : '';
+        const note = c.pop.notes ? ` · 📝 ${escTg(c.pop.notes)}` : '';
+        return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${loc}${note}`;
+      });
+      const otherDowns = curDowns.filter((d) => !downChanges.some((c) => c.pop.id === d.id));
+      let msg = `🚨 <b>ALARM POP DOWN (${downChanges.length} POP)</b>\n`
+        + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
+        + `📊 Status POP: <b>${curUps.length} UP</b> / <b>${curDowns.length} DOWN</b> (dari ${allPops.length} POP)\n\n`
+        + `<b>Daftar POP Baru Down (${downChanges.length}):</b>\n`
+        + lines.join('\n');
+      if (otherDowns.length) {
+        msg += `\n\n<b>POP Lain yang Masih Down (${otherDowns.length}):</b>\n`
+          + otherDowns.slice(0, 20).map((d) => `• ${escTg(d.name)} (<code>${escTg(d.ip)}</code>)${d.downSince ? ` – down ${fmtDurTg(Date.now() - d.downSince)}` : ''}`).join('\n');
+        if (otherDowns.length > 20) msg += `\n<i>...dan ${otherDowns.length - 20} POP lainnya</i>`;
+      }
+      msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
+      queueTelegram(msg);
+    }
+
+    if (upChanges.length && tg.popUp) {
+      const lines = upChanges.map((c, idx) => {
+        const dur = c.prevDownSince ? ` · Durasi putus: <b>${fmtDurTg(c.now - c.prevDownSince)}</b>` : '';
+        const rtt = c.rttMs != null ? ` · Ping: ${c.rttMs} ms` : '';
+        const loc = c.pop.location ? ` · 📍 ${escTg(c.pop.location)}` : '';
+        return `${idx + 1}. <b>${escTg(c.pop.name)}</b> (<code>${escTg(c.pop.ip)}</code>)${rtt}${dur}${loc}`;
+      });
+      let msg = `✅ <b>POP UP / PULIH (${upChanges.length} POP)</b>\n`
+        + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
+        + `📊 Status POP: <b>${curUps.length} UP</b> / <b>${curDowns.length} DOWN</b> (dari ${allPops.length} POP)\n\n`
+        + `<b>Daftar POP Kembali Online (${upChanges.length}):</b>\n`
+        + lines.join('\n');
+      if (curDowns.length) {
+        msg += `\n\n⚠️ <b>Masih Ada ${curDowns.length} POP Down:</b>\n`
+          + curDowns.slice(0, 15).map((d) => `• ${escTg(d.name)} (<code>${escTg(d.ip)}</code>)`).join('\n');
+      }
+      msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
+      queueTelegram(msg);
+    }
   }
   async pollPops() {
     if (this.stopped || this.pollingPops) return;
     this.pollingPops = true;
     try {
       const pops = DB.listPops(this.id);
+      const changes = [];
       for (const p of pops) {
         if (this.stopped) break;
-        await this.pollOnePop(p);
+        const ch = await this.pollOnePop(p);
+        if (ch) changes.push(ch);
       }
+      if (changes.length) this.notifyPopChanges(changes);
     } catch (e) { console.error(`[${this.r.name}] pops`, e.message); }
     this.pollingPops = false;
   }
@@ -220,14 +349,27 @@ class Collector {
         push(h.rx, Math.round(rxbps)); push(h.tx, Math.round(txbps));
       }
       // login/logout events = diff of active sessions between polls
-      const cur = new Set(active.map((a) => a.name));
+      const curMap = new Map(active.map((a) => [a.name, a]));
+      const cur = new Set(curMap.keys());
+      let downUsers = [], upUsers = [];
       if (this.prevActive) {
         const ts = Math.floor(now / 1000), ev = [];
-        for (const n of cur) if (!this.prevActive.has(n)) ev.push({ ts, name: n, event: 'up' });
-        for (const n of this.prevActive) if (!cur.has(n)) ev.push({ ts, name: n, event: 'down' });
+        for (const n of cur) {
+          if (!this.prevActive.has(n)) {
+            ev.push({ ts, name: n, event: 'up' });
+            upUsers.push(curMap.get(n) || { name: n });
+          }
+        }
+        for (const n of this.prevActive) {
+          if (!cur.has(n)) {
+            ev.push({ ts, name: n, event: 'down' });
+            downUsers.push((this.prevActiveMap && this.prevActiveMap.get(n)) || { name: n });
+          }
+        }
         DB.addEvents(this.id, ev);
       }
       this.prevActive = cur;
+      this.prevActiveMap = curMap;
       this.ifaces = list; this.active = active; this.resource = resource;
       this.health = Array.isArray(health) ? health : []; this.identity = identity.name || '';
       push(this.hist.t, now); push(this.hist.online, active.length); push(this.hist.cpu, +resource['cpu-load'] || 0);
@@ -236,8 +378,84 @@ class Collector {
       const sm = this.summary();
       DB.record(this.id, { t: now, online: sm.pppoe.online, offline: sm.pppoe.offline, cpu: sm.router.cpu, mem: sm.router.memUsedPct, rx: totRx, tx: totTx,
         ifs: list.map((i) => ({ name: i.name, rx: i.rxbps, tx: i.txbps, up: i.running || i.disabled })) });
-    } catch (e) { this.error = e.message; console.error(`[${this.r.name}]`, e.message); }
+
+      if (this.routerDownNotified) {
+        this.routerDownNotified = false;
+        this.failCount = 0;
+        const tg = DB.getTelegramSettings();
+        if (tg.enabled && tg.routerDown) {
+          const brand = DB.getSettings().companyName || 'NodeStats';
+          const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
+          queueTelegram(`✅ <b>ROUTER TERHUBUNG KEMBALI</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n📊 PPPoE Online: <b>${sm.pppoe.online}</b> · Offline: <b>${sm.pppoe.offline}</b>\n🕒 Waktu: ${fmtTimeTg(now)}`);
+        }
+      } else {
+        this.failCount = 0;
+      }
+      if (downUsers.length || upUsers.length) {
+        this.notifyPppoeChanges(downUsers, upUsers, sm);
+      }
+    } catch (e) {
+      this.error = e.message;
+      this.failCount = (this.failCount || 0) + 1;
+      console.error(`[${this.r.name}]`, e.message);
+      if (this.failCount >= 2 && !this.routerDownNotified) {
+        this.routerDownNotified = true;
+        const tg = DB.getTelegramSettings();
+        if (tg.enabled && tg.routerDown) {
+          const brand = DB.getSettings().companyName || 'NodeStats';
+          const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
+          queueTelegram(`🚨 <b>ROUTER TERPUTUS / TIDAK DAPAT DIAKSES!</b>\n🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n🌐 Host: <code>${escTg(this.r.host)}:${this.r.port}</code>\n⚠️ Error: <code>${escTg(e.message)}</code>\n🕒 Waktu: ${fmtTimeTg()}`);
+        }
+      }
+    }
     this.later(() => this.pollFast(), CFG.fast);
+  }
+  notifyPppoeChanges(downUsers, upUsers, sm) {
+    const tg = DB.getTelegramSettings();
+    if (!tg.enabled) return;
+    const brand = DB.getSettings().companyName || 'NodeStats';
+    const rLabel = `${this.r.name}${this.identity ? ` (${this.identity})` : ''}`;
+    const secMap = new Map(this.secrets.map((s) => [s.name, s]));
+    const MAX_LIST = 45;
+
+    if (downUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeDown) {
+      const shown = downUsers.slice(0, MAX_LIST).map((u, idx) => {
+        const sec = secMap.get(u.name);
+        const prof = sec?.profile ? ` [${escTg(sec.profile)}]` : '';
+        const ip = u.address ? ` · IP: <code>${escTg(u.address)}</code>` : '';
+        const up = u.uptime ? ` · Uptime: ${escTg(u.uptime)}` : '';
+        return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}${up}`;
+      });
+      let msg = `🔻 <b>PPPoE USER DOWN (${downUsers.length} User Putus)</b>\n`
+        + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
+        + `📊 Status PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n\n`
+        + `<b>Detail User Putus (${downUsers.length}):</b>\n`
+        + shown.join('\n');
+      if (downUsers.length > MAX_LIST) {
+        msg += `\n<i>...dan ${downUsers.length - MAX_LIST} user lainnya</i>`;
+      }
+      msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
+      queueTelegram(msg);
+    }
+
+    if (upUsers.length >= (tg.pppoeMinDown || 1) && tg.pppoeUp) {
+      const shown = upUsers.slice(0, MAX_LIST).map((u, idx) => {
+        const sec = secMap.get(u.name);
+        const prof = sec?.profile ? ` [${escTg(sec.profile)}]` : '';
+        const ip = u.address ? ` · IP: <code>${escTg(u.address)}</code>` : '';
+        return `${idx + 1}. <b>${escTg(u.name)}</b>${prof}${ip}`;
+      });
+      let msg = `🟢 <b>PPPoE USER UP (${upUsers.length} User Konek)</b>\n`
+        + `🏢 <b>${escTg(brand)}</b> · 🖥 Router: <b>${escTg(rLabel)}</b>\n`
+        + `📊 Status PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n\n`
+        + `<b>Detail User Konek (${upUsers.length}):</b>\n`
+        + shown.join('\n');
+      if (upUsers.length > MAX_LIST) {
+        msg += `\n<i>...dan ${upUsers.length - MAX_LIST} user lainnya</i>`;
+      }
+      msg += `\n\n🕒 Waktu: ${fmtTimeTg()}`;
+      queueTelegram(msg);
+    }
   }
   async pollSlow() {
     if (this.stopped) return;
@@ -430,6 +648,50 @@ http.createServer(async (req, res) => {
         return send(res, 400, { error: 'Format logo harus gambar (PNG/JPG/WEBP/SVG) atau URL http(s)' });
       }
       return send(res, 200, DB.setSettings(b));
+    }
+
+    // telegram notification settings & test
+    if (u.pathname === '/api/telegram' && req.method === 'GET') {
+      return send(res, 200, DB.getTelegramSettings());
+    }
+    if (u.pathname === '/api/telegram' && (req.method === 'POST' || req.method === 'PUT')) {
+      const b = await readBody(req);
+      return send(res, 200, DB.setTelegramSettings(b));
+    }
+    if (u.pathname === '/api/telegram/test' && req.method === 'POST') {
+      const b = await readBody(req);
+      const saved = DB.getTelegramSettings();
+      const cfg = {
+        botToken: b.botToken !== undefined ? b.botToken : saved.botToken,
+        chatId: b.chatId !== undefined ? b.chatId : saved.chatId,
+      };
+      const brand = DB.getSettings().companyName || 'NodeStats';
+      const rid = +q.get('router') || [...collectors.keys()][0];
+      const c = collectors.get(rid);
+      let statusSummary = '';
+      if (c) {
+        const sm = c.summary();
+        const pops = sm.pops.filter((x) => x.enabled);
+        const popDowns = pops.filter((x) => x.status === 'down');
+        const popUps = pops.filter((x) => x.status === 'up');
+        statusSummary = `\n🖥 Router: <b>${escTg(c.r.name)}${c.identity ? ` (${escTg(c.identity)})` : ''}</b>\n`
+          + `👥 PPPoE: <b>${sm.pppoe.online} Online</b> · <b>${sm.pppoe.offline} Offline</b> (${sm.pppoe.pct}%)\n`
+          + `📡 POP: <b>${popUps.length} UP</b> · <b>${popDowns.length} DOWN</b> (dari ${pops.length} POP)`;
+        if (popDowns.length) {
+          statusSummary += `\n\n🚨 <b>POP Sedang Down (${popDowns.length}):</b>\n`
+            + popDowns.slice(0, 15).map((p, i) => `${i + 1}. <b>${escTg(p.name)}</b> (<code>${escTg(p.ip)}</code>)`).join('\n');
+        }
+      }
+      const msg = `🔔 <b>TES NOTIFIKASI TELEGRAM BERHASIL</b>\n`
+        + `🏢 <b>${escTg(brand)}</b>${statusSummary}\n\n`
+        + `✅ Bot Telegram sudah terhubung dan siap mengirimkan notifikasi POP Down/Up & Pelanggan PPPoE Down.\n`
+        + `🕒 Waktu: ${fmtTimeTg()}`;
+      try {
+        const r = await sendTelegramMessage(msg, cfg);
+        return send(res, 200, { ok: true, sent: r.sent });
+      } catch (e) {
+        return send(res, 400, { error: 'Gagal kirim ke Telegram: ' + e.message });
+      }
     }
 
     // user management (Admin only)
